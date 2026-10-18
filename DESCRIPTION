@@ -14,8 +14,8 @@ Authors@R: c(
     person("INTERTRYP, IRD, CIRAD",
            role = "cph")
     )
-BugReports: https://github.com/KadNaf/PGA1/issues
-URL: https://github.com/KadNaf/PGA1
+BugReports: https://github.com/KadNaf/PGA-cmdr/issues
+URL: https://github.com/KadNaf/PGA-cmdr
 Description:
     PGA-cmdr is an interactive Shiny application for population genetics
     analyses based on multilocus individual genotype datasets. It provides

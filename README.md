@@ -21,7 +21,7 @@ All dependencies install automatically:
 ```r
 install.packages("remotes")
 
-remotes::install_github("KadNaf/PGA1")
+remotes::install_github("KadNaf/PGA-cmdr")
 
 pgacmdr::run_app()
 ```
@@ -52,7 +52,7 @@ CPPFLAGS += -I/opt/homebrew/opt/libomp/include -Xclang -fopenmp
 ## Docker
 
 ```bash
-git clone https://github.com/KadNaf/PGA1.git
+git clone https://github.com/KadNaf/PGA-cmdr.git
 cd PGA1
 docker compose up
 # open http://localhost:3838
@@ -116,4 +116,4 @@ MIT — see [LICENSE.md](LICENSE.md).
 
 ## Bugs & support
 
-<https://github.com/KadNaf/PGA1/issues>
+<https://github.com/KadNaf/PGA-cmdr/issues>
