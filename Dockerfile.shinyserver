@@ -1,0 +1,58 @@
+# ── Dockerfile.shinyserver ───────────────────────────────────────────────
+# PGA-cmdr - Shiny Server variant
+# Build:  docker build -f Dockerfile.shinyserver -t pgacmdr:shinyserver .
+# Run:    docker run --rm -p 3838:3838 pgacmdr:shinyserver
+
+FROM rocker/shiny:latest
+
+LABEL org.opencontainers.image.source="https://github.com/KadNaf/PGA1"
+LABEL org.opencontainers.image.licenses="MIT"
+
+# Disable renv and any user .Rprofile for all R commands in this image
+ENV R_PROFILE_USER=/dev/null
+
+# ── System libraries ──────────────────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    libxml2-dev \
+    libfontconfig1-dev \
+    libharfbuzz-dev \
+    libfribidi-dev \
+    libfreetype6-dev \
+    libpng-dev \
+    libtiff5-dev \
+    libjpeg-dev \
+    libudunits2-dev \
+    libgdal-dev \
+    libgeos-dev \
+    libproj-dev \
+    zlib1g-dev \
+    cmake \
+    ninja-build \
+    pandoc \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── R package dependencies ────────────────────────────────────────────────
+RUN R -e "install.packages('pak', repos = 'https://cloud.r-project.org')" && \
+    R -e "pak::pkg_install(c( \
+      'shiny', 'bslib', 'shinydashboard', 'shinyWidgets', 'shinyalert', \
+      'dplyr', 'tidyr', 'kableExtra', 'zip', \
+      'Rcpp', 'tibble', 'waiter', \
+      'duckdb', 'DBI', 'jsonlite', 'htmltools', 'magrittr', \
+      'knitr', 'rmarkdown', 'testthat', 'digest' \
+    ), ask = FALSE)"
+
+# ── Copy package source ───────────────────────────────────────────────────
+WORKDIR /build
+COPY . .
+
+# ── Build & install (compiles C++ with OpenMP via src/Makevars) ───────────
+RUN R CMD INSTALL --preclean .
+
+# ── Shiny Server configuration ────────────────────────────────────────────
+RUN cp inst/shiny-server.conf /etc/shiny-server/shiny-server.conf
+
+# ── Entry point ───────────────────────────────────────────────────────────
+EXPOSE 3838
+CMD ["/usr/bin/shiny-server"]

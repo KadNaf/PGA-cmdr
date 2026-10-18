@@ -1,0 +1,9 @@
+renv/
+.Rprofile
+*.tar.gz
+*.Rcheck
+*.RData
+*.Rhistory
+.git/
+dev/
+pgacmdr.Rcheck/

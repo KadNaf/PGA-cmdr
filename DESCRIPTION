@@ -1,0 +1,74 @@
+Package: pgacmdr
+Title: Interactive Shiny Application for Population Genetics
+Version: 0.1.0
+Authors@R: c(
+    person("Naffiou", "Kadiri",
+           email = "naffiou.kadiri@ird.fr",
+           role = c("aut", "cre")),
+    person("Vincent", "Manzanilla",
+           email = "vincent.manzanilla@ird.fr",
+           role = "aut"),
+    person("Thierry", "de Meeûs",
+           email = "thierry.demeeus@ird.fr",
+           role = "aut"),
+    person("INTERTRYP, IRD, CIRAD",
+           role = "cph")
+    )
+BugReports: https://github.com/KadNaf/PGA1/issues
+URL: https://github.com/KadNaf/PGA1
+Description:
+    PGA-cmdr is an interactive Shiny application for population genetics
+    analyses based on multilocus individual genotype datasets. It provides
+    tools for data import and formatting, allele frequency and missing-data
+    exploration, general statistics (Na, Ne, Ho, He), local and global
+    panmixia (FIS, FIT), population subdivision (FST), and genetic
+    diversities (HS, HT), all based on the Weir & Cockerham (1984)
+    estimators. It also provides pairwise linkage disequilibrium testing,
+    null allele frequency estimation with ENA correction (Chapuis & Estoup
+    2007, FreeNA), and isolation-by-distance analysis with a Mantel test
+    (Rousset 1997). Confidence intervals and significance are obtained by
+    bootstrap resampling and Monte Carlo permutation, parallelised in C++
+    via Rcpp and OpenMP.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Depends:
+    R (>= 4.1.0)
+LazyData: false
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3    
+Imports:
+    shiny (>= 1.7.0),
+    bslib (>= 0.9.0),
+    shinydashboard,
+    shinyWidgets,
+    shinyalert,
+    dplyr,
+    tidyr,
+    kableExtra,
+    knitr,
+    Rcpp (>= 1.0.0),
+    tibble,
+    waiter,
+    parallel,
+    stats,
+    utils,
+    graphics,
+    duckdb,
+    DBI,
+    jsonlite,
+    htmltools,
+    magrittr,
+    zip
+LinkingTo:
+    Rcpp
+VignetteBuilder: knitr
+SystemRequirements:
+    C++17, OpenMP
+Suggests:
+    testthat (>= 3.0.0),
+    digest,
+    golem (>= 0.4.0),
+    knitr,
+    rmarkdown,
+    hierfstat
+Config/testthat/edition: 3
