@@ -60,7 +60,7 @@ test_that("observed_wc84_stats_cpp() FST matches hierfstat::wc() on a toy datase
   ref_fst_global <- ref$FST
 
   # ---- pgacmdr C++ implementation --------------------------------------
-  res <- pgacmdr::observed_wc84_stats_cpp(
+  res <- pgacmdr:::observed_wc84_stats_cpp(
     dat, pop_col_1based = 1L, missing_code = 0L, base = base
   )
 
