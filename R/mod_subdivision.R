@@ -5,7 +5,7 @@ mod_subdivision_ui <- function(id) {
   fluidPage(
     tags$head(gs_head()),
 
-    module_banner("sitemap", "Population Subdivision · FST · G-test",""),
+    module_banner("sitemap", "Population Subdivision \u00b7 FST \u00b7 G-test",""),
 
     fluidRow(
       box(

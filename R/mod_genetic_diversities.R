@@ -5,7 +5,7 @@ mod_genetic_diversities_ui <- function(id) {
   fluidPage(
     tags$head(gs_head()),
 
-    module_banner("chart-line", "Genetic Diversities · HS · HT",""),
+    module_banner("chart-line", "Genetic Diversities \u00b7 HS \u00b7 HT",""),
 
     fluidRow(
       box(

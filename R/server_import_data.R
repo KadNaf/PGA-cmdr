@@ -607,7 +607,7 @@ server_import_data <- function(id, rv) {
         icon("check-circle"), " ", rv$load_status)
     })
 
-    # ── Numbered column reference: lets the operator see exactly which
+    # -- Numbered column reference: lets the operator see exactly which
     #    number corresponds to which column name, so the loci range (and
     #    Population/Latitude/Longitude choices) can be entered correctly.
     output$ui_columns_index <- renderUI({
@@ -643,12 +643,12 @@ server_import_data <- function(id, rv) {
       )
     })
 
-    # ── Loci range: Create-style input (number of loci + first locus
+    # -- Loci range: Create-style input (number of loci + first locus
     #    column), with a read-only preview of the resulting range kept for
-    #    verification. ──────────────────────────────────────────────────────
-    # ── Detect whether loci are stored as ONE combined genotype column
+    #    verification. ------------------------------------------------------
+    # -- Detect whether loci are stored as ONE combined genotype column
     #    each, or as a PAIR of columns (allele1 in the base name, allele2
-    #    in a "<name>_1" / "<name>.1" column right after it) — very common
+    #    in a "<name>_1" / "<name>.1" column right after it) - very common
     #    in raw genotype files. If the data is paired, "N loci" must span
     #    2*N raw columns, not N.
     .cols_per_locus <- function(colnames_all, first_col) {
@@ -659,10 +659,10 @@ server_import_data <- function(id, rv) {
       if (identical(name2, paste0(name1, "_1")) || identical(name2, paste0(name1, ".1"))) 2L else 1L
     }
 
-    # ── Auto-suggest "Number of loci": as soon as the operator enters the
+    # -- Auto-suggest "Number of loci": as soon as the operator enters the
     #    first locus column, compute how many complete loci fit from there
     #    to the end of the file (accounting for paired-column format), and
-    #    pre-fill the field with that suggestion — the operator can still
+    #    pre-fill the field with that suggestion - the operator can still
     #    adjust it down if some of those trailing columns aren't loci.
     observeEvent(input$first_locus_col, {
       first_col <- suppressWarnings(as.integer(input$first_locus_col))

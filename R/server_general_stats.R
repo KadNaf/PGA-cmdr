@@ -147,21 +147,21 @@ server_general_stats <- function(id, rv) {
       colnames(mat) <- c("pop", as.character(loci))
       attr(mat, "pop_levels") <- pop_levels
 
-      # ── Réordonner les colonnes selon l'ordre physique DuckDB ──────────
-      # hf_mat_r() retourne ORDER BY 1 (alphabétique).
-      # On réordonne ici une fois pour toutes — tous les caluls en aval
-      # héritent du bon ordre sans modification.
-      loci_alpha   <- as.character(loci)              # ordre alphabétique actuel
+      # -- Reordonner les colonnes selon l'ordre physique DuckDB ----------
+      # hf_mat_r() retourne ORDER BY 1 (alphabetique).
+      # On reordonne ici une fois pour toutes - tous les caluls en aval
+      # heritent du bon ordre sans modification.
+      loci_alpha   <- as.character(loci)              # ordre alphabetique actuel
       loci_ordered <- loci_order_r()                  # ordre physique DuckDB
 
       reorder_idx  <- match(loci_ordered, loci_alpha)
       reorder_idx  <- reorder_idx[!is.na(reorder_idx)]
 
-      # col 1 = pop (inchangée), puis loci dans l'ordre physique
+      # col 1 = pop (inchangee), puis loci dans l'ordre physique
       mat <- mat[, c(1L, reorder_idx + 1L), drop = FALSE]
 
       # IMPORTANT: matrix column-subsetting with `[` does NOT preserve
-      # custom attributes (only dim/dimnames survive) — "pop_levels" was
+      # custom attributes (only dim/dimnames survive) - "pop_levels" was
       # silently dropped by the re-ordering just above, which made the
       # G-test output fall back to generic "Pop1".."PopN" labels. Re-attach it.
       attr(mat, "pop_levels") <- pop_levels
@@ -169,14 +169,14 @@ server_general_stats <- function(id, rv) {
       mat
     })
 
-    # ── Ordre physique des loci depuis DuckDB (MIN(rowid)) ──────────────────
-    # Même logique que locus_order_cte() dans server_allele_frequencies
+    # -- Ordre physique des loci depuis DuckDB (MIN(rowid)) ------------------
+    # Meme logique que locus_order_cte() dans server_allele_frequencies
     loci_order_r <- reactive({
       db_ready()
       con     <- con_r()
       tbl_hf  <- tbl_hf_r()
 
-      # Détecter le nom de la colonne locus
+      # Detecter le nom de la colonne locus
       info      <- DBI::dbGetQuery(con, sprintf("PRAGMA table_info(%s)",
                     DBI::dbQuoteIdentifier(con, tbl_hf)))
       locus_col <- if ("locus" %in% info$name) "locus" else "locus_id"
@@ -248,8 +248,8 @@ server_general_stats <- function(id, rv) {
 
       wide <- as.data.frame(wide, stringsAsFactors = FALSE)
 
-      # ── Réordonner les lignes selon l'ordre physique DuckDB ────────────────
-      # wide$Locus est en ordre alphabétique (ORDER BY 1 dans duck_hs_by_pop_locus_long)
+      # -- Reordonner les lignes selon l'ordre physique DuckDB ----------------
+      # wide$Locus est en ordre alphabetique (ORDER BY 1 dans duck_hs_by_pop_locus_long)
       # loci_order_r() donne l'ordre physique MIN(rowid)
       loci_ordered <- loci_order_r()
       reorder_idx  <- match(loci_ordered, wide$Locus)
@@ -360,8 +360,8 @@ server_general_stats <- function(id, rv) {
     }
 
     
-    # ── One button, one click, one action: clicking "Run" IS the download
-    #    request itself — computes the selected basic statistics, the
+    # -- One button, one click, one action: clicking "Run" IS the download
+    #    request itself - computes the selected basic statistics, the
     #    always-available gene-diversity / by-population tables (for ALL
     #    populations automatically), AND the per-allele F-statistics, all
     #    bundled into one zip.
@@ -405,7 +405,7 @@ server_general_stats <- function(id, rv) {
 
         all_files <- c(p1, p2, p3)
 
-        # Per-allele F-statistics (formerly its own separate Run button) —
+        # Per-allele F-statistics (formerly its own separate Run button) -
         # computed automatically here too, so a single click covers both.
         fres <- .run_allele_fstats_computation()
         if (!is.null(fres)) {
@@ -446,7 +446,7 @@ server_general_stats <- function(id, rv) {
     ## Download handlers (population section) ####
     # =========================================================#
     
-    # 2) Overall by population (Ho/Hs/Fis Nei) — rendered on-screen only,
+    # 2) Overall by population (Ho/Hs/Fis Nei) - rendered on-screen only,
     #    downloadable via the merged Run+Download button above.
 
     
@@ -473,7 +473,7 @@ server_general_stats <- function(id, rv) {
       
       pop_lookup <- stats::setNames(pop_names, pop_codes)
       
-      # 2) Observed population-wise FIS — WC84 ratio-of-sums (C++)
+      # 2) Observed population-wise FIS - WC84 ratio-of-sums (C++)
       obs_pop <- wc_fis_by_pop_wc84(
         dat     = mat,
         pop_col = 0L,
@@ -512,7 +512,7 @@ server_general_stats <- function(id, rv) {
       ci_u <- apply(boot_mat, 2, stats::quantile, probs = 1 - alpha, na.rm = TRUE, type = 7)
 
       # Fewer than 5 individuals in a given sub-sample (population): its
-      # individual bootstrap is not meaningful — report NA for that
+      # individual bootstrap is not meaningful - report NA for that
       # population specifically, not the whole analysis.
       pop_sizes <- table(as.character(mat[, 1]))
       names(pop_sizes) <- unname(pop_lookup[names(pop_sizes)])
@@ -667,7 +667,7 @@ server_general_stats <- function(id, rv) {
         B       = as.integer(n_boot),
         base    = as.integer(base)
       )
-      # 4) Bootstrap summaries (individual bootstrap — always computed)
+      # 4) Bootstrap summaries (individual bootstrap - always computed)
       summary_list <- summarize_fis_results(
         boot = boot_mat,
         conf = conf_level
@@ -678,7 +678,7 @@ server_general_stats <- function(id, rv) {
       n_subs_avail_fis <- length(unique(mat[, 1]))
       if (n_subs_avail_fis < 5L) {
         # Fewer than 5 sub-samples (populations): bootstrap over sub-samples
-        # is not meaningful — report NA instead of computing.
+        # is not meaningful - report NA instead of computing.
         na_loc <- rep(NA_real_, length(locus_names))
         summary_pop_list <- list(
           mean = na_loc, ci_lower = na_loc, ci_upper = na_loc,
@@ -821,7 +821,7 @@ server_general_stats <- function(id, rv) {
         start_time <- Sys.time()
         shinyWidgets::updateProgressBar(session, "fis_progress", value = 5)
         
-        # Both analysis levels are always computed — no selector needed.
+        # Both analysis levels are always computed - no selector needed.
         results_locus <- run_fis_by_locus(
           n_perm       = input$n_perm,
           n_boot       = input$n_boot,
@@ -975,7 +975,7 @@ server_general_stats <- function(id, rv) {
     
     
     
-    # ── Methods/parameters block written at the TOP of the single FIS output file.
+    # -- Methods/parameters block written at the TOP of the single FIS output file.
     .write_fis_params <- function(con, res) {
       nb <- input$n_boot
       hdr <- c(
@@ -1041,8 +1041,8 @@ server_general_stats <- function(id, rv) {
       )
     }
 
-    # ── One button, one click, one action: clicking "Run" IS the download
-    #    request itself — both analysis levels run inside this same
+    # -- One button, one click, one action: clicking "Run" IS the download
+    #    request itself - both analysis levels run inside this same
     #    content() function and everything (methods block + By Locus +
     #    By Population) is written to ONE plain .txt file (no zip, no figure).
     output$ui_fis_out_status <- renderUI({
@@ -1066,7 +1066,7 @@ server_general_stats <- function(id, rv) {
       }
     )
 
-    ## ---- Locus × Population cross-table ----
+    ## ---- Locus x Population cross-table ----
     fis_locus_pop_r <- reactiveVal(NULL)
 
     .run_fis_locus_pop_computation <- function() {
@@ -1093,7 +1093,7 @@ server_general_stats <- function(id, rv) {
       fis_m   <- matrix(NA_real_, nrow = L, ncol = np, dimnames = list(locus_names, pop_names))
       pval_m  <- matrix(NA_real_, nrow = L, ncol = np, dimnames = list(locus_names, pop_names))
       # Fstat (manual sec. 7.3.1) reports the deficit/excess one-sided tests
-      # SEPARATELY rather than combining them into a single bilateral value —
+      # SEPARATELY rather than combining them into a single bilateral value -
       # kept alongside our own two-sided p-value (a different, but standard,
       # |permuted| >= |observed| convention) for direct comparability.
       pval_deficit_m <- matrix(NA_real_, nrow = L, ncol = np, dimnames = list(locus_names, pop_names))
@@ -1173,7 +1173,7 @@ server_general_stats <- function(id, rv) {
       writeLines(hdr, con = con, useBytes = TRUE)
     }
 
-    # ── One button, one click, one action: clicking "Run" IS the download
+    # -- One button, one click, one action: clicking "Run" IS the download
     #    request itself; everything is written to ONE plain .txt file.
     output$ui_fislp_out_status <- renderUI({
       tags$p(style = "color:#555;font-size:14px;margin-top:6px;",
@@ -1227,8 +1227,8 @@ server_general_stats <- function(id, rv) {
           base         = allele_base,
           missing_code = 0L
         )
-        # Sort by Locus (in the ORIGINAL data column order — not
-        # alphabetically) then Allele (numeric) — the C++ routine doesn't
+        # Sort by Locus (in the ORIGINAL data column order - not
+        # alphabetically) then Allele (numeric) - the C++ routine doesn't
         # guarantee output order.
         loc_col <- intersect(c("Locus", "locus", "Marker"), names(out))[1]
         all_col <- intersect(c("Allele", "allele"), names(out))[1]
@@ -1299,7 +1299,7 @@ server_general_stats <- function(id, rv) {
       n_subs_avail_fit <- length(unique(mat[, 1]))
       if (n_subs_avail_fit < 5L) {
         # Fewer than 5 sub-samples (populations): bootstrap over sub-samples
-        # is not meaningful — report NA instead of computing.
+        # is not meaningful - report NA instead of computing.
         nL <- length(locus_names)
         na_mat <- matrix(NA_real_, nrow = as.integer(n_boot), ncol = nL,
                           dimnames = list(NULL, locus_names))
@@ -1592,8 +1592,8 @@ server_general_stats <- function(id, rv) {
       writeLines(hdr, con = con, useBytes = TRUE)
     }
 
-    # ── One button, one click, one action: clicking "Run" IS the download
-    #    request itself — the FIT bootstrap/permutation runs inside this
+    # -- One button, one click, one action: clicking "Run" IS the download
+    #    request itself - the FIT bootstrap/permutation runs inside this
     #    same content() function and the methods block + results are written
     #    to ONE plain .txt file (no zip, no figure).
     output$ui_fit_out_status <- renderUI({
@@ -1656,11 +1656,11 @@ server_general_stats <- function(id, rv) {
     fst_parallel_meta <- reactiveVal(NULL)
     # Genetic Diversities used to share fst_boot_results/fst_boot_timing with
     # Subdivision (both call the same run_bootstrap_fst_analysis() helper,
-    # which computes FST/HS/HT together) — this silently showed one module's
+    # which computes FST/HS/HT together) - this silently showed one module's
     # on-screen summary boxes with the OTHER module's last-run results
     # whenever they were run with different parameters. Each module's own
     # downloaded file was never affected (each already computed and wrote
-    # its own fresh result directly) — only the value boxes were shared.
+    # its own fresh result directly) - only the value boxes were shared.
     # Giving Diversities its own reactiveVal fixes this without changing
     # what either module computes.
     div_boot_results <- reactiveVal(NULL)
@@ -1798,7 +1798,7 @@ server_general_stats <- function(id, rv) {
       n_subs_avail <- length(unique(mat[, 1]))
       if (n_subs_avail < 5L) {
         # Fewer than 5 sub-samples (populations): bootstrap over sub-samples
-        # is not meaningful — report NA instead of computing.
+        # is not meaningful - report NA instead of computing.
         nL <- length(loci_names)
         na_mat <- matrix(NA_real_, nrow = as.integer(n_boot), ncol = nL,
                           dimnames = list(NULL, loci_names))
@@ -1892,7 +1892,7 @@ server_general_stats <- function(id, rv) {
       hs_overall_boot <- boot_pop_res$HS_overall_boot
       ht_overall_boot <- boot_pop_res$HT_overall_boot
       
-      # ── Population-block (subsamples) bootstrap CI ──────────────────────────
+      # -- Population-block (subsamples) bootstrap CI --------------------------
       sum_hs <- .step("summarize_boot_ci(HS)", summarize_boot_ci(
         boot_mat     = hs_boot_mat,
         obs          = hs_obs_vec,
@@ -1909,7 +1909,7 @@ server_general_stats <- function(id, rv) {
         confidence   = conf_level
       ))
 
-      # ── FIT / FIS overall, bootstrap over SUB-SAMPLES ────────────────────────
+      # -- FIT / FIS overall, bootstrap over SUB-SAMPLES ------------------------
       # The C++ routine returns per-locus replicates; the overall value of each
       # replicate is the mean over loci (same convention as the Global Panmixia
       # module). FIS is derived per locus from (1-FIT) = (1-FIS)(1-FST).
@@ -1929,7 +1929,7 @@ server_general_stats <- function(id, rv) {
         }
       }
 
-      # ── Individual bootstrap CI for HS (resample individuals within pops) ──
+      # -- Individual bootstrap CI for HS (resample individuals within pops) --
       # Genetic Diversities only (skipped for Subdivision, see diversity_extras).
       if (isTRUE(diversity_extras)) {
         indiv_boot_res <- .step("boot_indiv_hs_cpp()", boot_indiv_hs_cpp(
@@ -1967,7 +1967,7 @@ server_general_stats <- function(id, rv) {
         names(pvals_by_locus) <- loc_fst
       }
 
-      # ── Helper: build per-locus + Overall HS table for one bootstrap mode ──
+      # -- Helper: build per-locus + Overall HS table for one bootstrap mode --
       # bias_shift = TRUE (bootstrap over INDIVIDUALS): the percentile CI is shifted by
       # (observed - bootstrap mean), see pga_ci_bias_shift() for the reason.
       .hs_boot_tbl <- function(sum_obj, indiv_boot_mat, indiv_boot_overall,
@@ -2017,7 +2017,7 @@ server_general_stats <- function(id, rv) {
                                   hs_boot_mat, hs_overall_boot,
                                   hs_obs_vec, hs_obs_overall, loc_hs)
 
-      # Table 3: HS by loci — Overall only (from locus_boot_tbl)
+      # Table 3: HS by loci - Overall only (from locus_boot_tbl)
       hs_locus_tbl <- tryCatch({
         row <- locus_boot_tbl[locus_boot_tbl$Statistic == "HS", ,drop = FALSE]
         data.frame(
@@ -2353,7 +2353,7 @@ server_general_stats <- function(id, rv) {
     })
 
 
-    # ── Methods block written at the TOP of the single Subdivision output file.
+    # -- Methods block written at the TOP of the single Subdivision output file.
     .write_fst_params <- function(con, res, gres) {
       md <- if (is.list(res)) res$metadata else NULL
       loci <- md$loci_names %||% character(0)
@@ -2387,13 +2387,13 @@ server_general_stats <- function(id, rv) {
       writeLines(hdr, con = con, useBytes = TRUE)
     }
 
-    # ── One button, one click, one action: clicking "Run" IS the download
-    #    request itself — the FST bootstrap/permutation AND the G-based test
+    # -- One button, one click, one action: clicking "Run" IS the download
+    #    request itself - the FST bootstrap/permutation AND the G-based test
     #    run inside this same content() function, and everything (methods
     #    block + FST per locus + multilocus estimators + G-based test, then the
     #    optional bootstrap replicate values) is written to ONE plain .txt
     #    file (no zip, no figure).
-    #    Populates fst_boot_results()/fst_boot_timing() — Subdivision's own
+    #    Populates fst_boot_results()/fst_boot_timing() - Subdivision's own
     #    value boxes only; Genetic Diversities has its own separate
     #    div_boot_results()/div_boot_timing().
     output$ui_fst_out_status <- renderUI({
@@ -2672,7 +2672,7 @@ server_general_stats <- function(id, rv) {
     # Helper: build a combined per-locus + Overall plot for HS or HT.
     # Mirrors FST plot style: size=3, width=0.2, no size/linewidth aesthetics.
 
-    # ── Methods block written at the TOP of the single Diversities file.
+    # -- Methods block written at the TOP of the single Diversities file.
     .write_div_params <- function(con, res) {
       md   <- if (is.list(res)) res$metadata else NULL
       loci <- md$loci_names %||% character(0)
@@ -2709,8 +2709,8 @@ server_general_stats <- function(id, rv) {
       writeLines("", con = con)
     }
 
-    # ── One button, one click, one action: clicking "Run" IS the download
-    #    request itself — the bootstrap analysis runs inside this same
+    # -- One button, one click, one action: clicking "Run" IS the download
+    #    request itself - the bootstrap analysis runs inside this same
     #    content() function and ALL results are written to ONE plain .txt
     #    file (methods block + 5 sections + optional replicate values; no zip,
     #    no figures).
@@ -2759,7 +2759,7 @@ server_general_stats <- function(id, rv) {
 
     ## Reactive containers ----
 
-    ## G à partir d'un tableau de comptage n_pop x n_allele ("flat", vecteur) ----
+    ## G a partir d'un tableau de comptage n_pop x n_allele ("flat", vecteur) ----
     .g_stat_from_flat <- function(cnt_flat, n_pop, n_allele) {
       cnt <- matrix(cnt_flat, nrow = n_pop, ncol = n_allele)
       rs  <- rowSums(cnt); cs <- colSums(cnt); n <- sum(cnt)
@@ -2770,13 +2770,13 @@ server_general_stats <- function(id, rv) {
       2 * sum(cnt[ok] * log(cnt[ok] / E[ok]))
     }
 
-    ## Tableau allèle x population vectorisé via tabulate() ----
+    ## Tableau allele x population vectorise via tabulate() ----
     ## pop_idx0    : code population 0-based, longueur n_valid
-    ## allele_idx0 : code allèle 0-based pour c(a1,a2), longueur 2*n_valid (PRÉ-CALCULÉ, fixe)
+    ## allele_idx0 : code allele 0-based pour c(a1,a2), longueur 2*n_valid (PRE-CALCULE, fixe)
     .g_stat_vec <- function(pop_idx0, allele_idx0, n_pop, n_allele) {
-      pop2 <- c(pop_idx0, pop_idx0)                       # même pop pour a1 et a2 d'un individu
+      pop2 <- c(pop_idx0, pop_idx0)                       # meme pop pour a1 et a2 d'un individu
       bin  <- pop2 + n_pop * allele_idx0 + 1L              # index 1-based dans la matrice n_pop x n_allele
-      cnt_flat <- tabulate(bin, nbins = n_pop * n_allele)  # comptage en C — rapide
+      cnt_flat <- tabulate(bin, nbins = n_pop * n_allele)  # comptage en C - rapide
       .g_stat_from_flat(cnt_flat, n_pop, n_allele)
     }
 
@@ -2795,8 +2795,8 @@ server_general_stats <- function(id, rv) {
       ok <- tryCatch({
         start_time <- Sys.time()
 
-        # ── Sources DB-first (même pattern que FST) ──────────────────────────
-        mat  <- hf_mat_r()   # colonnes déjà réordonnées via loci_order_r() dans hf_mat_r
+        # -- Sources DB-first (meme pattern que FST) --------------------------
+        mat  <- hf_mat_r()   # colonnes deja reordonnees via loci_order_r() dans hf_mat_r
         base <- base_r()
 
         # NOTE: hf_mat_r() already returns a genuine matrix carrying a
@@ -2804,7 +2804,7 @@ server_general_stats <- function(id, rv) {
         # as.matrix() is needed here; storage.mode<- below keeps attributes
         # and is enough to guarantee integer type. (The generic "Pop1".."PopN"
         # labels once seen in the G-test output came from the column
-        # re-ordering inside hf_mat_r(), which dropped the attribute — fixed
+        # re-ordering inside hf_mat_r(), which dropped the attribute - fixed
         # there, see the comment in hf_mat_r().)
         storage.mode(mat) <- "integer"
         shiny::validate(
@@ -2814,7 +2814,7 @@ server_general_stats <- function(id, rv) {
           shiny::need(isTRUE(is.finite(base)) && base > 1L, "Invalid base from params")
         )
 
-        # loci_names dans l'ordre physique DuckDB (hf_mat_r() réordonné par loci_order_r())
+        # loci_names dans l'ordre physique DuckDB (hf_mat_r() reordonne par loci_order_r())
         loci_names <- colnames(mat)[-1L]
         if (is.null(loci_names) || length(loci_names) == 0L)
           loci_names <- paste0("L", seq_len(ncol(mat) - 1L))
@@ -2823,15 +2823,15 @@ server_general_stats <- function(id, rv) {
 
         pop_codes <- as.integer(mat[, 1L])
 
-        # ── Restriction FSTAT : génotypes multi-locus COMPLETS uniquement ────────
-        # FSTAT (Goudet et al. 1996, §7.1, note 1) : "Only complete multilocus
+        # -- Restriction FSTAT : genotypes multi-locus COMPLETS uniquement --------
+        # FSTAT (Goudet et al. 1996, ?7.1, note 1) : "Only complete multilocus
         # genotypes are randomised, to make sure that the combined test over loci
-        # is valid." L'en-tête des fichiers FSTAT_G ("Number of complete
+        # is valid." L'en-tete des fichiers FSTAT_G ("Number of complete
         # multilocus genotypes in the different samples") confirme qu'un seul
-        # sous-ensemble FIXE d'individus (non manquants à TOUS les loci
-        # simultanément) est utilisé pour l'ensemble du test, et pas,
-        # comme précédemment ici, un sous-ensemble différent par locus selon
-        # ses propres données manquantes (cela change à la fois le G observé
+        # sous-ensemble FIXE d'individus (non manquants a TOUS les loci
+        # simultanement) est utilise pour l'ensemble du test, et pas,
+        # comme precedemment ici, un sous-ensemble different par locus selon
+        # ses propres donnees manquantes (cela change a la fois le G observe
         # et la distribution nulle de permutation).
         geno_mat      <- mat[, -1L, drop = FALSE]
         complete_mask <- rowSums(is.na(geno_mat) | geno_mat <= 0L) == 0L
@@ -2846,20 +2846,20 @@ server_general_stats <- function(id, rv) {
         pop_idx0_full <- match(pop_codes_complete, pops) - 1L   # 0-based, sous-ensemble complet
         mat_complete  <- mat[complete_mask, , drop = FALSE]
 
-        # Noms de populations : source UNIQUE (attribut posé par hf_mat_r()) — plus de
-        # requête DB séparée dont l'ordre alphabétique n'est pas garanti correspondre
-        # positionnellement aux codes `pops` (source du mauvais étiquetage précédent).
+        # Noms de populations : source UNIQUE (attribut pose par hf_mat_r()) - plus de
+        # requete DB separee dont l'ordre alphabetique n'est pas garanti correspondre
+        # positionnellement aux codes `pops` (source du mauvais etiquetage precedent).
         pop_levels_attr <- attr(mat, "pop_levels")
         pop_names <- if (!is.null(pop_levels_attr)) as.character(pop_levels_attr)[pops]
                      else paste0("Pop", pops)
 
-        # ── Décoder les génotypes et pré-calculer les index allèles (fixes, hors permutation) ──
-        # gt = a1*base + a2 — identique au décodage dans ld_pvalues_cpp
+        # -- Decoder les genotypes et pre-calculer les index alleles (fixes, hors permutation) --
+        # gt = a1*base + a2 - identique au decodage dans ld_pvalues_cpp
         # Tous les individus restants (mat_complete) sont, par construction,
-        # non manquants à CHAQUE locus — loci_idx est donc identique (1:n) pour
-        # tous les loci, mais on garde le même schéma générique par sécurité.
+        # non manquants a CHAQUE locus - loci_idx est donc identique (1:n) pour
+        # tous les loci, mais on garde le meme schema generique par securite.
         loci_idx      <- vector("list", n_loci)  # lignes de mat_complete valides pour ce locus
-        loci_allele0  <- vector("list", n_loci)  # code allèle 0-based, longueur 2*n_valid (fixe)
+        loci_allele0  <- vector("list", n_loci)  # code allele 0-based, longueur 2*n_valid (fixe)
         loci_n_allele <- integer(n_loci)
         loci_n_valid  <- integer(n_loci)
 
@@ -2881,9 +2881,9 @@ server_general_stats <- function(id, rv) {
           loci_n_valid[j]   <- length(idx)
         }
 
-        # ── G observé par locus + permutations — moteur C++ natif (voir
-        # src/g_test_subdivision.cpp, vérifié ligne à ligne contre la logique
-        # R ci-dessous), avec repli automatique sur R en cas d'échec.
+        # -- G observe par locus + permutations - moteur C++ natif (voir
+        # src/g_test_subdivision.cpp, verifie ligne a ligne contre la logique
+        # R ci-dessous), avec repli automatique sur R en cas d'echec.
         loci_idx0 <- lapply(loci_idx, function(ix) as.integer(ix - 1L))
 
         cpp_ok <- TRUE
@@ -2897,7 +2897,7 @@ server_general_stats <- function(id, rv) {
           g_obs <- as.numeric(obs_res$g_obs); names(g_obs) <- loci_names
           g_obs_overall <- obs_res$g_obs_overall
         } else {
-          # ── Repli R (identique à l'ancienne implémentation) ──────────────
+          # -- Repli R (identique a l'ancienne implementation) --------------
           g_obs <- vapply(seq_len(n_loci), function(j) {
             pop0_j <- pop_idx0_full[loci_idx[[j]]]
             if (loci_n_allele[j] < 2L || length(unique(pop0_j)) < 2L) return(NA_real_)
@@ -2908,11 +2908,11 @@ server_general_stats <- function(id, rv) {
         }
 
 
-        # ── Permutations ──────────────────────────────────────────────────────
-        # H0 (FSTAT, NOT assuming HW within samples) : les GÉNOTYPES complets sont
-        # réassignés au hasard entre populations. On tire une seule permutation
-        # globale par réplicat b (niveau individu), réutilisée pour tous les loci
-        # (même individu = même ré-affectation partout dans un même réplicat),
+        # -- Permutations ------------------------------------------------------
+        # H0 (FSTAT, NOT assuming HW within samples) : les GENOTYPES complets sont
+        # reassignes au hasard entre populations. On tire une seule permutation
+        # globale par replicat b (niveau individu), reutilisee pour tous les loci
+        # (meme individu = meme re-affectation partout dans un meme replicat),
         # en ne gardant que les lignes valides de chaque locus.
         n_ind          <- length(pop_idx0_full)
         G_null_locus   <- matrix(NA_real_, nrow = n_perm, ncol = n_loci)
@@ -2920,8 +2920,8 @@ server_general_stats <- function(id, rv) {
 
         set.seed(as.integer(.seed()))
 
-        # Moteur C++ : tourne par lots (jusqu'à 20) pour garder une barre de
-        # progression fluide, tout en exécutant la boucle chaude (permutations
+        # Moteur C++ : tourne par lots (jusqu'a 20) pour garder une barre de
+        # progression fluide, tout en executant la boucle chaude (permutations
         # x loci) en code natif au lieu d'une boucle R + vapply().
         if (cpp_ok) {
           n_batches <- max(1L, min(20L, n_perm))
@@ -2944,9 +2944,9 @@ server_general_stats <- function(id, rv) {
           }, error = function(e) FALSE)
         }
 
-        # ── Repli R (identique à l'ancienne implémentation) — utilisé si le
-        # moteur C++ (observé OU permutations) a échoué pour une raison
-        # quelconque ; redémarre proprement avec la même graine.
+        # -- Repli R (identique a l'ancienne implementation) - utilise si le
+        # moteur C++ (observe OU permutations) a echoue pour une raison
+        # quelconque ; redemarre proprement avec la meme graine.
         if (!cpp_ok) {
           set.seed(as.integer(.seed()))
           for (b in seq_len(n_perm)) {
@@ -2966,7 +2966,7 @@ server_general_stats <- function(id, rv) {
         }
 
 
-        # ── P-values : deux définitions, comme FSTAT (colonnes [>= obs] et [> obs]) ──
+        # -- P-values : deux definitions, comme FSTAT (colonnes [>= obs] et [> obs]) --
         .pvals <- function(obs, null) {
           null <- null[is.finite(null)]
           if (!is.finite(obs) || length(null) == 0L) return(c(NA_real_, NA_real_))
@@ -2984,8 +2984,8 @@ server_general_stats <- function(id, rv) {
         p_ge_overall  <- p_overall_vec[1]
         p_gt_overall  <- p_overall_vec[2]
 
-        # ── Tables finales ────────────────────────────────────────────────────
-        # Ordre = ordre physique DuckDB (loci_names de hf_mat_r réordonné)
+        # -- Tables finales ----------------------------------------------------
+        # Ordre = ordre physique DuckDB (loci_names de hf_mat_r reordonne)
         per_locus_tbl <- data.frame(
           ID       = loci_names,
           N_geno   = loci_n_valid,
@@ -3006,7 +3006,7 @@ server_general_stats <- function(id, rv) {
           row.names = NULL
         )
 
-        # Overall toujours en dernière ligne — même convention que FST
+        # Overall toujours en derniere ligne - meme convention que FST
         final_tbl <- rbind(per_locus_tbl, overall_row)
 
 

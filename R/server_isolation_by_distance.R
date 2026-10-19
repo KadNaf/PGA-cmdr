@@ -5,7 +5,7 @@ server_isolation_by_distance <- function(id, rv) {
 
     `%||%` <- function(a, b) if (!is.null(a) && !(length(a) == 1 && is.na(a))) a else b
 
-    # ── DB plumbing (same conventions as other modules) ──────────────────────
+    # -- DB plumbing (same conventions as other modules) ----------------------
     db_tick    <- reactive({ rv$db_tick })
     con_r      <- reactive({ shiny::req(rv$con); rv$con })
     tbl_meta_r <- reactive({ rv$tbl_meta %||% "meta" })
@@ -18,12 +18,12 @@ server_isolation_by_distance <- function(id, rv) {
       TRUE
     })
 
-    # ── Null Alleles module results (shared via rv — nothing recomputed) ────
+    # -- Null Alleles module results (shared via rv - nothing recomputed) ----
     na_results_r <- reactive({
       r <- rv$null_alleles_results
       shiny::validate(shiny::need(!is.null(r),
         paste0("No results yet. Go to the \"Null alleles\" module, choose your ",
-               "per-locus coding, and click \"Compute + Bootstrap + Export\" first — ",
+               "per-locus coding, and click \"Compute + Bootstrap + Export\" first \u2014 ",
                "this module reuses those results directly (nothing is recomputed here).")))
       r
     })
@@ -46,11 +46,11 @@ server_isolation_by_distance <- function(id, rv) {
                 length(r$markers), length(r$pops), nrow(r$fst_pair$long)))
     })
 
-    # ══════════════════════════════════════════════════════════════════════
-    #  OUTPUT FILE NAMING — root auto-proposed from the imported data file's
+    # ??????????????????????????????????????????????????????????????????????
+    #  OUTPUT FILE NAMING - root auto-proposed from the imported data file's
     #  name (editable, never silently overwritten once the user has typed
     #  their own), + optional suffix.
-    # ══════════════════════════════════════════════════════════════════════
+    # ??????????????????????????????????????????????????????????????????????
     last_auto_root_ibd <- reactiveVal("")
     observeEvent(rv$dataset_filename, {
       fn <- rv$dataset_filename
@@ -73,8 +73,8 @@ server_isolation_by_distance <- function(id, rv) {
       paste0(ibd_out_root_r(), "-", desc, ".txt")
     }
 
-    # ── Same auto-fill-from-dataset-name mechanism, for the Mantel Test
-    #    output name field. ───────────────────────────────────────────────
+    # -- Same auto-fill-from-dataset-name mechanism, for the Mantel Test
+    #    output name field. -----------------------------------------------
     last_auto_root_mt <- reactiveVal("")
     observeEvent(rv$dataset_filename, {
       fn <- rv$dataset_filename
@@ -94,7 +94,7 @@ server_isolation_by_distance <- function(id, rv) {
       if (nzchar(r)) r else if (nzchar(last_auto_root_mt())) last_auto_root_mt() else "PGA_"
     })
 
-    # ── Population GPS centroids (needed for D_geo; IBD-specific) ───────────
+    # -- Population GPS centroids (needed for D_geo; IBD-specific) -----------
     coords_r <- reactive({
       db_ready()
       con  <- con_r()
@@ -115,9 +115,9 @@ server_isolation_by_distance <- function(id, rv) {
       df
     })
 
-    # ══════════════════════════════════════════════════════════════════════
-    #  GEOGRAPHIC DISTANCE — Vincenty ellipsoidal geodesic (WGS84), in metres
-    # ══════════════════════════════════════════════════════════════════════
+    # ??????????????????????????????????????????????????????????????????????
+    #  GEOGRAPHIC DISTANCE - Vincenty ellipsoidal geodesic (WGS84), in metres
+    # ??????????????????????????????????????????????????????????????????????
     .vincenty_m <- function(lat1, lon1, lat2, lon2) {
       a <- 6378137.0; f <- 1/298.257223563; b <- (1 - f) * a
       L  <- (lon2 - lon1) * pi / 180
@@ -147,10 +147,10 @@ server_isolation_by_distance <- function(id, rv) {
       b * A * (sigma - deltaSigma)
     }
 
-    # ══════════════════════════════════════════════════════════════════════
-    #  FULL PAIRWISE TABLE — sourced ENTIRELY from rv$null_alleles_results —
+    # ??????????????????????????????????????????????????????????????????????
+    #  FULL PAIRWISE TABLE - sourced ENTIRELY from rv$null_alleles_results -
     #  nothing recomputed here except D_geo/ln(D_geo).
-    # ══════════════════════════════════════════════════════════════════════
+    # ??????????????????????????????????????????????????????????????????????
     .linearise <- function(x) { x <- pmin(pmax(x, 0), 0.9999); x / (1 - x) }
 
     full_pair_table_r <- reactive({
@@ -161,7 +161,7 @@ server_isolation_by_distance <- function(id, rv) {
       }
     })
 
-    # ── EXTERNAL SOURCE: re-load a previously exported (and freely edited)
+    # -- EXTERNAL SOURCE: re-load a previously exported (and freely edited)
     #    pairwise file. Column names matching the Null Alleles export
     #    (FST_raw, FST_ENA, DCSE_raw, DCSE_INA, their _lo/_hi CI bounds,
     #    FR/FR_raw + CI, Dgeo_m, lnDgeo) are used directly when present;
@@ -217,7 +217,7 @@ server_isolation_by_distance <- function(id, rv) {
       df
     })
 
-    # ── INTERNAL SOURCE (default): built entirely from the Null Alleles
+    # -- INTERNAL SOURCE (default): built entirely from the Null Alleles
     #    module's results shared via rv$null_alleles_results.
     full_pair_table_internal_r <- reactive({
       na <- na_results_r()
@@ -255,7 +255,7 @@ server_isolation_by_distance <- function(id, rv) {
       df$FR_raw_lo <- .linearise(df$FST_raw_lo)
       df$FR_raw_hi <- .linearise(df$FST_raw_hi)
 
-      # D_geo is always the GPS/Vincenty geodesic distance here — the exact
+      # D_geo is always the GPS/Vincenty geodesic distance here - the exact
       # same computation as the Null Alleles module's Full pairwise table.
       coords <- tryCatch(coords_r(), error = function(e) NULL)
       if (!is.null(coords)) {
@@ -274,9 +274,9 @@ server_isolation_by_distance <- function(id, rv) {
       df
     })
 
-    # ══════════════════════════════════════════════════════════════════════
-    #  TAB 1 — Isolation by Distance (Rousset 1997)
-    # ══════════════════════════════════════════════════════════════════════
+    # ??????????????????????????????????????????????????????????????????????
+    #  TAB 1 - Isolation by Distance (Rousset 1997)
+    # ??????????????????????????????????????????????????????????????????????
 
     .fit_line <- function(y, x) {
       ok <- is.finite(y) & is.finite(x)
@@ -356,7 +356,7 @@ server_isolation_by_distance <- function(id, rv) {
     ibd_results_store <- reactiveVal(NULL)
     ibd_results_r <- function() ibd_results_store()
 
-    # ── Results file: the regression summary table only ────────────────────
+    # -- Results file: the regression summary table only --------------------
     .write_ibd_results <- function(con) {
       r <- ibd_results_r()
       s <- as.data.frame(r$summary, stringsAsFactors = FALSE)
@@ -365,7 +365,7 @@ server_isolation_by_distance <- function(id, rv) {
       write.table(s, file = con, sep = "\t", row.names = FALSE, quote = FALSE, append = TRUE)
     }
 
-    # ── Parameters file: everything about how this run was configured ──────
+    # -- Parameters file: everything about how this run was configured ------
     .write_ibd_params <- function(con) {
       r <- ibd_results_r()
       na <- tryCatch(na_results_r(), error = function(e) NULL)
@@ -392,8 +392,8 @@ server_isolation_by_distance <- function(id, rv) {
       writeLines(hdr, con = con, useBytes = TRUE)
     }
 
-    # ── One button, one click, one action: clicking "Run" IS the download
-    #    request itself — the regression computation happens inside this
+    # -- One button, one click, one action: clicking "Run" IS the download
+    #    request itself - the regression computation happens inside this
     #    same content() function before the two files are zipped and
     #    streamed back. No JS auto-click, no server round-trip in between.
     output$run_ibd <- downloadHandler(
@@ -422,12 +422,12 @@ server_isolation_by_distance <- function(id, rv) {
     })
 
 
-    # ══════════════════════════════════════════════════════════════════════
-    #  TAB 2 — Mantel test (joint row/column permutation; rectangular-safe)
-    #  Both p-value formulas — (b+1)/(m+1) and b/m — live in this single tab
+    # ??????????????????????????????????????????????????????????????????????
+    #  TAB 2 - Mantel test (joint row/column permutation; rectangular-safe)
+    #  Both p-value formulas - (b+1)/(m+1) and b/m - live in this single tab
     #  now, selected via a radio button, so results/formula are always shown
     #  together and never accidentally mismatched.
-    # ══════════════════════════════════════════════════════════════════════
+    # ??????????????????????????????????????????????????????????????????????
 
     .mt_build_square <- function(df, id1, id2, value_col, all_labels) {
       n <- length(all_labels)
@@ -531,7 +531,7 @@ server_isolation_by_distance <- function(id, rv) {
       }
     })
 
-    # ── Uploaded-file confirmations ──────────────────────────────────────
+    # -- Uploaded-file confirmations --------------------------------------
     .file_status_ui <- function(fileinfo, df_reactive) {
       if (is.null(fileinfo)) return(tags$p(style="color:#999;font-size:11px;", icon("info-circle"), " No file uploaded yet."))
       n <- tryCatch(nrow(df_reactive()), error = function(e) NA_integer_)
@@ -563,7 +563,7 @@ server_isolation_by_distance <- function(id, rv) {
 
     # Scale-adaptive formatting: fixed "%.6f" makes any statistic smaller
     # than ~1e-6 collapse to the same visible value across many permutation
-    # quantiles — this shows enough significant digits regardless of scale.
+    # quantiles - this shows enough significant digits regardless of scale.
     .fmt_stat <- function(x, digits = 6) {
       if (!is.finite(x)) return("NA")
       if (x != 0 && abs(x) < 10^(-(digits - 1))) formatC(x, format = "e", digits = digits - 1)
@@ -637,7 +637,7 @@ server_isolation_by_distance <- function(id, rv) {
     })
 
     # Build a symmetric matrix of RANKS from a symmetric matrix of raw
-    # values — used to feed the C++ cross-product engines for a
+    # values - used to feed the C++ cross-product engines for a
     # Spearman-style test (rank first, then test the ranks with the same
     # cross-product engine as Pearson/slope).
     .rank_matrix <- function(m) {
@@ -712,7 +712,7 @@ server_isolation_by_distance <- function(id, rv) {
       #   - otherwise the picked column IS the linear scale, and the log
       #     scale is derived via log().
       # Without this, picking "lnDgeo" vs "Dgeo_m" as X used to give
-      # different (wrong) results for Rousset's 1D/2D — 1D silently tested
+      # different (wrong) results for Rousset's 1D/2D - 1D silently tested
       # log-distance when lnDgeo was picked, and 2D double-logged it. Kept
       # as its own function so each statistic group (which may now use a
       # different X column) applies it identically and correctly.
@@ -820,7 +820,7 @@ server_isolation_by_distance <- function(id, rv) {
     })
 
     # Output-file label for each statistic (short form, matching the
-    # requested results format — distinct from the longer UI checkbox
+    # requested results format - distinct from the longer UI checkbox
     # labels used elsewhere, e.g. "Pearson r" / "Rousset's 1D").
     .mantel_out_label <- function(key) {
       switch(key,
@@ -859,8 +859,8 @@ server_isolation_by_distance <- function(id, rv) {
     }
 
 
-    # ── One button, one click, one action: clicking "Run" IS the download
-    #    request itself — a single results file, zipped, no separate
+    # -- One button, one click, one action: clicking "Run" IS the download
+    #    request itself - a single results file, zipped, no separate
     #    "parameters" file (not needed for Mantel).
     output$run_mantel <- downloadHandler(
       filename = function() paste0(mt_out_root_r(), "-Mantel-Res.zip"),

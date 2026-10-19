@@ -237,7 +237,7 @@ infer_base_from_marker_strings <- function(marker_df, sep = "/", sample_n = 5000
 
   if (length(x) > sample_n) x <- sample(x, sample_n)
 
-  # ── Cas 1 : format "a1/a2" (fichiers string diploid) ─────────────────────
+  # -- Cas 1 : format "a1/a2" (fichiers string diploid) ---------------------
   x_sep <- x[grepl("/", x, fixed = TRUE)]
   if (length(x_sep)) {
     a <- suppressWarnings(as.integer(sub("/.*$",  "", x_sep)))
@@ -248,7 +248,7 @@ infer_base_from_marker_strings <- function(marker_df, sep = "/", sample_n = 5000
     }
   }
 
-  # ── Cas 2 : entiers bruts (fichiers Create/Genetix, paired columns) ───────
+  # -- Cas 2 : entiers bruts (fichiers Create/Genetix, paired columns) -------
   x_int <- suppressWarnings(as.integer(x))
   x_int <- x_int[!is.na(x_int) & x_int > 0]
   if (length(x_int)) {
@@ -672,18 +672,18 @@ reset_downstream_state <- function(rv) {
 
   DBI::dbExecute(con, sprintf("DROP TABLE IF EXISTS %s;", .sql_ident(tbl_raw)))
 
-  # ── Pré-traitement : détection FIABLE de l'encodage + en-têtes dupliqués ──
-  # BUG CORRIGÉ : readLines(..., encoding = "UTF-8") ne VALIDE PAS le contenu ;
-  # elle ne lève (quasiment) jamais d'erreur sur des octets UTF-8 invalides
-  # (ex. 0xE9 seul, typique des fichiers Latin-1 / Windows-1252 exportés
+  # -- Pre-traitement : detection FIABLE de l'encodage + en-tetes dupliques --
+  # BUG CORRIGE : readLines(..., encoding = "UTF-8") ne VALIDE PAS le contenu ;
+  # elle ne leve (quasiment) jamais d'erreur sur des octets UTF-8 invalides
+  # (ex. 0xE9 seul, typique des fichiers Latin-1 / Windows-1252 exportes
   # depuis Excel ou FSTAT sous Windows, comme les noms de population
-  # accentués, "Bakolé", etc.). Le tryCatch précédent ne se déclenchait donc
-  # (presque) jamais : le fichier était relu comme "UTF-8" avec des octets
+  # accentues, "Bakole", etc.). Le tryCatch precedent ne se declenchait donc
+  # (presque) jamais : le fichier etait relu comme "UTF-8" avec des octets
   # invalides, puis DuckDB (ignore_errors = TRUE plus bas) supprimait
-  # SILENCIEUSEMENT toute ligne qu'il ne pouvait pas parser — typiquement une
-  # population entière — sans aucun avertissement pour l'utilisateur.
+  # SILENCIEUSEMENT toute ligne qu'il ne pouvait pas parser - typiquement une
+  # population entiere - sans aucun avertissement pour l'utilisateur.
   #
-  # On teste donc explicitement la validité UTF-8 sur les OCTETS BRUTS avant
+  # On teste donc explicitement la validite UTF-8 sur les OCTETS BRUTS avant
   # toute lecture, et on convertit proprement (Latin-1 -> UTF-8) si besoin.
   raw_bytes     <- readBin(file_path, what = "raw", n = file.info(file_path)$size)
   is_valid_utf8 <- tryCatch(validUTF8(rawToChar(raw_bytes, multiple = FALSE)),
@@ -692,8 +692,8 @@ reset_downstream_state <- function(rv) {
   raw_lines <- if (isTRUE(is_valid_utf8)) {
     readLines(file_path, encoding = "UTF-8", warn = FALSE)
   } else {
-    # Latin-1 / Windows-1252 : le cas le plus fréquent pour des fichiers de
-    # génétique des populations produits sous Windows. On lit tel quel, puis
+    # Latin-1 / Windows-1252 : le cas le plus frequent pour des fichiers de
+    # genetique des populations produits sous Windows. On lit tel quel, puis
     # on convertit explicitement vers UTF-8 (au lieu de laisser passer des
     # octets invalides qui feront tomber DuckDB en silence plus bas).
     lines_latin1 <- readLines(file_path, encoding = "latin1", warn = FALSE)
@@ -712,11 +712,11 @@ reset_downstream_state <- function(rv) {
 
   tmp_file <- tempfile(fileext = ".txt")
   on.exit(unlink(tmp_file), add = TRUE)
-  # useBytes = TRUE : les lignes sont déjà proprement encodées en UTF-8
-  # ci-dessus ; on écrit les octets tels quels sans laisser R réinterpréter/
-  # re-corrompre l'encodage déclaré de chaque chaîne.
+  # useBytes = TRUE : les lignes sont deja proprement encodees en UTF-8
+  # ci-dessus ; on ecrit les octets tels quels sans laisser R reinterpreter/
+  # re-corrompre l'encodage declare de chaque chaine.
   writeLines(raw_lines, tmp_file, useBytes = TRUE)
-  # ── Fin pré-traitement ────────────────────────────────────────────────────
+  # -- Fin pre-traitement ----------------------------------------------------
 
   q_file <- DBI::dbQuoteString(con, normalizePath(tmp_file, winslash = "/"))
   q_sep  <- DBI::dbQuoteString(con, sep)
@@ -745,10 +745,10 @@ reset_downstream_state <- function(rv) {
     }
   )
 
-  # ── Garde-fou : ignore_errors = TRUE fait taire DuckDB sur toute ligne
-  # illisible (encodage résiduel, colonnes mal formées, etc.) — c'est
-  # exactement ce qui a fait disparaître "Bakolé" sans avertissement. On
-  # vérifie donc après coup qu'aucune ligne n'a été perdue silencieusement,
+  # -- Garde-fou : ignore_errors = TRUE fait taire DuckDB sur toute ligne
+  # illisible (encodage residuel, colonnes mal formees, etc.) - c'est
+  # exactement ce qui a fait disparaitre "Bakole" sans avertissement. On
+  # verifie donc apres coup qu'aucune ligne n'a ete perdue silencieusement,
   # et on alerte l'utilisateur sinon.
   n_imported <- tryCatch(
     DBI::dbGetQuery(con, sprintf("SELECT COUNT(*) AS n FROM %s;", .sql_ident(tbl_raw)))$n[[1]],
@@ -939,7 +939,7 @@ reset_downstream_state <- function(rv) {
     uniq_ratio <- length(unique(xi)) / length(xi)
     if (uniq_ratio > 0.8) return(FALSE)
     
-    # keep your existing “not GPS/UTM-like” guardrails
+    # keep your existing "not GPS/UTM-like" guardrails
     if (max(xi, na.rm = TRUE) > 5000) return(FALSE)
     if (max(nchar(as.character(xi)), na.rm = TRUE) > 4) return(FALSE)
     
@@ -982,8 +982,8 @@ reset_downstream_state <- function(rv) {
     "^deme$", "^site$", "^locality$", "^location$", "^sampling_site$",
     "^samplinglocation$", "^group$", "^cluster$", "^subpop$",
     "^subpopulation$", "^strata$", "^stratum$", "^region$", "^zone$",
-    # ── termes Create / Genetix / Fstat ──────────────────────────────
-    "^area$", "^areas$", "^local$", "^localite$", "^localité$",
+    # -- termes Create / Genetix / Fstat ------------------------------
+    "^area$", "^areas$", "^local$", "^localite$", "^localit\u00e9$",
     "^provenance$", "^village$", "^pays$", "^collection$",
     "^origin$", "^origine$", "^habitat$", "^patch$"
   )
@@ -1307,8 +1307,8 @@ boot_popblock_wc84_fst_auto <- function(mat,
   )
 
   Ho   <- as.numeric(nei$Ho)
-  Hs   <- as.numeric(nei$Hs)   # Nei's HS — used for GST / GST'' / display
-  Ht   <- as.numeric(nei$Ht)   # Nei's HT — used for GST / GST'' / display
+  Hs   <- as.numeric(nei$Hs)   # Nei's HS - used for GST / GST'' / display
+  Ht   <- as.numeric(nei$Ht)   # Nei's HT - used for GST / GST'' / display
   k_eff <- if (!is.null(nei$k_eff)) as.integer(nei$k_eff) else rep.int(as.integer(k), length(Ht))
 
   # Nei Fis/Fst from heterozygosities
@@ -1453,7 +1453,7 @@ boot_popblock_wc84_fst_auto <- function(mat,
   }
 
   # ----------------------------------------------------------------
-  # F'ST (W&C, Meirmans 2006) — empirical standardisation
+  # F'ST (W&C, Meirmans 2006) - empirical standardisation
   #
   #   F'ST(Meirmans) = FST_WC84(obs) / FST_WC84(Meirmans-recoded)
   #
@@ -1463,7 +1463,7 @@ boot_popblock_wc84_fst_auto <- function(mat,
   ok_fp <- is.finite(FST_wc) & is.finite(Fst_max) & Fst_max > 0
   Fst_prime_meirmans[ok_fp] <- FST_wc[ok_fp] / Fst_max[ok_fp]
   # ----------------------------------------------------------------
-  # F'ST (Hedrick) — Thierry/FSTAT-compatible implementation
+  # F'ST (Hedrick) - Thierry/FSTAT-compatible implementation
   #
   #   FST'(Hedrick) = FST / (1 - Hs)
   #
@@ -1521,7 +1521,7 @@ boot_popblock_wc84_fst_auto <- function(mat,
   FIT_wc_overall <- .clamp01(as.numeric(st$FIT_overall_ratio_of_sums))
   FIS_wc_overall <- .clamp01(as.numeric(st$FIS_overall_ratio_of_sums))
 
-  # --- Overall H (Nei) — for display columns + GST / GST'' ---
+  # --- Overall H (Nei) - for display columns + GST / GST'' ---
   Ho_overall    <- mean(Ho,   na.rm = TRUE)
   Hs_overall    <- mean(Hs,   na.rm = TRUE)   # Nei's HS
   Ht_overall    <- mean(Ht,   na.rm = TRUE)   # Nei's HT
@@ -1843,7 +1843,7 @@ summarize_boot_ci <- function(boot_mat,
 
 # ============================================================
 # 2. EM null-allele estimation (Dempster, Laird & Rubin 1977 / FreeNA)
-#    — faithful to rDempster_per_locus, including the corrected cpt=0 formula
+#    - faithful to rDempster_per_locus, including the corrected cpt=0 formula
 # ============================================================
 
 
@@ -1856,7 +1856,7 @@ summarize_boot_ci <- function(boot_mat,
 
 
 # ============================================================
-# 4. Cavalli-Sforza & Edwards chord distance — one locus, one pair
+# 4. Cavalli-Sforza & Edwards chord distance - one locus, one pair
 # ============================================================
 
 
@@ -1867,7 +1867,7 @@ summarize_boot_ci <- function(boot_mat,
 
 
 # ============================================================
-# 6. Loci bootstrap — ONE shared resampled-loci sequence per replicate,
+# 6. Loci bootstrap - ONE shared resampled-loci sequence per replicate,
 #    applied simultaneously to every statistic (global, pairwise, raw, ena,
 #    Fst and CS distance) exactly as in the Pascal main loop.
 # ============================================================
@@ -1876,7 +1876,7 @@ summarize_boot_ci <- function(boot_mat,
 # Output-file metadata header (added so that every exported result file is
 # self-describing: which dataset it came from, which subsamples/loci went
 # into it, how many permutations/bootstrap replicates were used and what,
-# exactly, was permuted/resampled — see project audit, Subdivision module).
+# exactly, was permuted/resampled - see project audit, Subdivision module).
 # ============================================================================
 
 

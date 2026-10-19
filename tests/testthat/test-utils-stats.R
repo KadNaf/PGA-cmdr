@@ -148,6 +148,6 @@ test_that("sub-sample bootstrap is reproducible: same result whatever the number
   a <- boot_wc84_stats_popblock_cpp(mat, 1L, 0L, 1000L, 500L, 0.95, 1L, 1L)
   b <- boot_wc84_stats_popblock_cpp(mat, 1L, 0L, 1000L, 500L, 0.95, 1L, 2L)
   c <- boot_wc84_stats_popblock_cpp(mat, 1L, 0L, 1000L, 500L, 0.95, 1L, 2L)
-  expect_identical(a$FIT_boot, b$FIT_boot)    # used to differ: the stream depended on the thread number
+  expect_equal(a$FIT_boot, b$FIT_boot, tolerance = 1e-12)  # same RNG stream; only FP summation order may differ across threads
   expect_identical(b$FIT_boot, c$FIT_boot)
 })

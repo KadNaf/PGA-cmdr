@@ -13,7 +13,7 @@ server_allele_frequencies <- function(id, rv) {
     sql_id  <- function(con, x) as.character(DBI::dbQuoteIdentifier(con, x))
     sql_str <- function(con, x) as.character(DBI::dbQuoteString(con, x))
 
-    # ── Output file name: auto-filled from the imported dataset's name ─────
+    # -- Output file name: auto-filled from the imported dataset's name -----
     last_auto_root_af <- reactiveVal("")
     observeEvent(rv$dataset_filename, {
       fn <- rv$dataset_filename
@@ -40,7 +40,7 @@ server_allele_frequencies <- function(id, rv) {
         "The results will be saved in ", tags$code(fstat_out_filename()), ".")
     })
 
-    # ── Defensive DB wrapper ─────────────────────────────────────────────────
+    # -- Defensive DB wrapper -------------------------------------------------
     # Converts any DBI/DuckDB error (dropped connection, unexpected schema,
     # malformed query) into a clean shiny::validate() message instead of an
     # uncaught R error propagating to the UI. Wrap every dbGetQuery()/
@@ -55,7 +55,7 @@ server_allele_frequencies <- function(id, rv) {
       )
     }
 
-    # ── Reactive plumbing ──────────────────────────────────────────────────
+    # -- Reactive plumbing --------------------------------------------------
     db_tick    <- reactive({ rv$db_tick })
     con_r      <- reactive({ req(rv$con); rv$con })
     tbl_meta_r <- reactive({ rv$tbl_meta %||% "meta" })
@@ -127,13 +127,13 @@ server_allele_frequencies <- function(id, rv) {
       list(ind_col=ind_col, pop_col=pop_col)
     })
 
-    # ── Locus order ────────────────────────────────────────────────────────
+    # -- Locus order --------------------------------------------------------
     locus_order_cte <- function(con, hf_tbl_q, hl_q)
       sprintf("locus_order AS (
   SELECT CAST(%s AS VARCHAR) AS _lo_marker, MIN(rowid) AS _lo_rank
   FROM %s GROUP BY CAST(%s AS VARCHAR))", hl_q, hf_tbl_q, hl_q)
 
-    # ── Population / marker lists ──────────────────────────────────────────
+    # -- Population / marker lists ------------------------------------------
     pops_r <- reactive({
       db_ready(); con <- con_r(); ms <- meta_schema_r()
       as.character(db_try(DBI::dbGetQuery(con, sprintf(
@@ -171,7 +171,7 @@ server_allele_frequencies <- function(id, rv) {
     fstat_shown_r <- reactiveVal(FALSE)
 
 
-    # ── Fstat long reactive ────────────────────────────────────────────────
+    # -- Fstat long reactive ------------------------------------------------
     fstat_long_r <- reactive({
       con <- con_r(); hs <- hf_schema_r(); ms <- meta_schema_r()
       base <- as.integer(base_r())
@@ -257,7 +257,7 @@ ORDER BY lo._lo_rank ASC, f.Population, f.Allele",
         hf_q,meta_q,hi_q,mi_q, pop_q,pop_f,mark_f, pop_q,hl_q)), "le calcul des frequences alleliques")
     })
 
-    # ── Pivot to wide display ──────────────────────────────────────────────
+    # -- Pivot to wide display ----------------------------------------------
     fstat_wide_r <- reactive({
       long <- req(fstat_long_r())
       if (nrow(long)==0L) return(NULL)
@@ -329,8 +329,8 @@ ORDER BY lo._lo_rank ASC, f.Population, f.Allele",
 
 
 
-    # ── One button, one click, one action: clicking "Run" IS the download
-    #    request itself — the allele-frequency query runs inside this same
+    # -- One button, one click, one action: clicking "Run" IS the download
+    #    request itself - the allele-frequency query runs inside this same
     #    content() function (via fstat_wide_r()) before the single results
     #    file is streamed back. Also flips fstat_shown_r() so the on-screen
     #    table appears too.
@@ -342,7 +342,7 @@ ORDER BY lo._lo_rank ASC, f.Population, f.Allele",
         req(wide)
         pops <- attr(wide, "pops")
         # Diversity-index rows (Na/Ne/He/Ho/Fis) are reported in the
-        # General Statistics module instead — not needed in this table.
+        # General Statistics module instead - not needed in this table.
         wide <- wide[wide$Row_type != "div_stat", , drop = FALSE]
         write.table(wide[, c("Locus", "Row_label", pops, "Global")], file = file,
                     sep = "\t", row.names = FALSE, quote = FALSE)

@@ -25,7 +25,7 @@ import_data_ui <- function(id) {
 
     module_banner("upload", "Import Data",""),
 
-    # ── Row 1: two config boxes side by side, same height ───────────────────
+    # -- Row 1: two config boxes side by side, same height -------------------
     tags$div(
       class = "import-top-row",
       fluidRow(

@@ -179,7 +179,7 @@ server_LD <- function(id, rv) {
       
       fixed_cols <- c("Population", "individual")
       # Keep the locus columns in data order (the order they were built in
-      # above) — no sort(): an alphabetical sort here used to scramble them.
+      # above) - no sort(): an alphabetical sort here used to scramble them.
       locus_cols <- intersect(loci, setdiff(names(out), fixed_cols))
       out <- out[, c(fixed_cols, locus_cols), drop = FALSE]
 
@@ -207,7 +207,7 @@ server_LD <- function(id, rv) {
     
     # Note: the low-permutations warning that used to pop up on click is now
     # written into the generated parameters file instead (see .run_ld_computation
-    # and the parameters writer below) — downloadButton clicks don't have a
+    # and the parameters writer below) - downloadButton clicks don't have a
     # "before the file starts" interactive step to show a modal in.
 
     .run_ld_computation <- function() {
@@ -331,7 +331,7 @@ server_LD <- function(id, rv) {
     
     # -----------------------------#
     # One button, one click, one action: clicking "Run" IS the download
-    # request itself — the LD permutation test runs inside this same
+    # request itself - the LD permutation test runs inside this same
     # content() function before the two files are zipped and streamed back.
     # -----------------------------#
     .write_ld_params <- function(con, pv) {
@@ -364,7 +364,7 @@ server_LD <- function(id, rv) {
     }
 
     # One button, one click, one action: clicking "Run" IS the download
-    # request itself — the LD permutation test runs inside this same
+    # request itself - the LD permutation test runs inside this same
     # content() function and the methods block + results are written to ONE
     # plain .txt file (no zip).
     output$ui_ld_out_status <- renderUI({

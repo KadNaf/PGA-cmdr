@@ -1,6 +1,6 @@
 # logos.R
 # Read logo files from the installed package and return base64 data URIs.
-# Called once inside app_ui() — no resource path, no external URL dependency.
+# Called once inside app_ui() - no resource path, no external URL dependency.
 
 .read_logo <- function(filename, mime) {
   path <- system.file("app/www", filename, package = "pgacmdr")

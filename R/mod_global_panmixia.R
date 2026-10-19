@@ -5,7 +5,7 @@ mod_global_panmixia_ui <- function(id) {
   fluidPage(
     tags$head(gs_head()),
 
-    module_banner("globe", "Global Panmixia · FIT",""),
+    module_banner("globe", "Global Panmixia \u00b7 FIT",""),
 
     fluidRow(
       box(

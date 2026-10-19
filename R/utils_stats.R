@@ -1,5 +1,5 @@
 # ============================================================================
-# utils_stats.R — pure statistical helpers (no Shiny, no database)
+# utils_stats.R - pure statistical helpers (no Shiny, no database)
 #
 # Everything in this file works on plain R objects so that it can be unit-tested
 # outside the application (see tests/testthat/test-utils_stats.R). The Shiny

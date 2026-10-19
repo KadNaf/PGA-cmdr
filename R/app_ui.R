@@ -37,7 +37,7 @@ app_ui <- function() {
 
   # -- Theme -----------------------------------------------------------------
 
-  # Wes Anderson palettes — full reference:
+  # Wes Anderson palettes - full reference:
   #  Royal1:        #FAEFD1                          (cream page bg)
   #  IsleofDogs2:   #EAD3BF #AA9486 #B6854D #39312F #1C1718
   #  IsleofDogs1:   #9986A5 #79402E #CCBA72 #D9D0D3 #8D8680
@@ -78,7 +78,7 @@ app_ui <- function() {
       color: #333a43;
     }
     /* Many hint/status paragraphs throughout the app were set with small
-       inline font sizes (11-13px) — raise the floor so they stay readable. */
+       inline font sizes (11-13px) - raise the floor so they stay readable. */
     .box p, .shiny-html-output p {
       font-size: 14px !important;
     }
@@ -87,7 +87,7 @@ app_ui <- function() {
       padding: 20px;
       min-height: calc(100vh - 56px);
     }
-    /* Welcome page is now short (module grid/help/citation removed) —
+    /* Welcome page is now short (module grid/help/citation removed) -
        don't force it to fill the viewport, or a big empty gap appears
        above the partner-logos footer. */
     body.pga-welcome-mode .bslib-page-navbar > .tab-content {
@@ -102,7 +102,7 @@ app_ui <- function() {
        GrandBudapest2: #C6CDF7 (dark-mode link only)
     ===== */
 
-    /* ===== BOX — white cards on light-grey page ===== */
+    /* ===== BOX - white cards on light-grey page ===== */
     .box {
       border-radius: 4px !important;
       border-top:   none !important;
@@ -119,7 +119,7 @@ app_ui <- function() {
       padding: 0 !important;                        /* title div provides its own padding */
       border-radius: 4px 4px 0 0 !important;
     }
-    /* Fallback: plain title without inner div — restore padding */
+    /* Fallback: plain title without inner div - restore padding */
     .box-header .box-title {
       padding: 10px 16px;
       display: block;
@@ -150,7 +150,7 @@ app_ui <- function() {
       border-bottom: 2px solid #8ea1b9 !important;
     }
 
-    /* ===== NAVBAR — dark grey #333a43 ===== */
+    /* ===== NAVBAR - dark grey #333a43 ===== */
     .navbar {
       padding-top: 0; padding-bottom: 0; min-height: 52px;
       background-color: #333a43 !important;
@@ -175,9 +175,9 @@ app_ui <- function() {
     }
 
     /* ===== valueBox significance gradient =====
-       maroon = B40F20 dark red  (FantasticFox1 — p < 0.001)
-       orange = E1AF00 amber     (Zissou1       — p < 0.05)
-       aqua   = 3B9AB2 teal      (Zissou1       — not significant)
+       maroon = B40F20 dark red  (FantasticFox1 - p < 0.001)
+       orange = E1AF00 amber     (Zissou1       - p < 0.05)
+       aqua   = 3B9AB2 teal      (Zissou1       - not significant)
     ===== */
     .bg-maroon, .small-box.bg-maroon { background-color: #B40F20 !important; }
     .bg-maroon > .inner, .bg-maroon > .icon { background-color: #B40F20 !important; }
@@ -250,14 +250,14 @@ app_ui <- function() {
     }
 
     /* ===== BUTTONS ===== */
-    /* Action/compute — dark grey, white text */
+    /* Action/compute - dark grey, white text */
     .btn-action-primary, .btn-action-primary.btn-primary {
       background-color: #333a43 !important; color: #FFFFFF !important;
       border: none !important; font-weight: 600; border-radius: 3px;
     }
     .btn-action-primary:hover { background-color: #1e242b !important; }
 
-    /* All download buttons — dark grey */
+    /* All download buttons - dark grey */
     .btn-download-primary, .btn-download-secondary, .btn-download-info,
     .btn-primary, .btn-block.btn-primary,
     .btn-outline-primary {
@@ -467,10 +467,10 @@ app_ui <- function() {
     }
     .btn-action-secondary:hover { background-color: #333a43 !important; }
 
-    /* ── Default: navbar hidden (welcome is entry page; sidebar shows it) ── */
+    /* -- Default: navbar hidden (welcome is entry page; sidebar shows it) -- */
     .bslib-page-navbar > nav.navbar { display: none !important; }
 
-    /* ── Left sidebar mode: embedded flex layout ─────────────────────────── */
+    /* -- Left sidebar mode: embedded flex layout --------------------------- */
     body.pga-sidebar-mode.bslib-page-navbar {
       display: flex !important;
       flex-direction: row !important;
@@ -568,7 +568,7 @@ app_ui <- function() {
       overflow-x: auto !important;
       padding-top: 0 !important;
     }
-    /* Welcome page: thin overlay scrollbar — visible only while scrolling,
+    /* Welcome page: thin overlay scrollbar - visible only while scrolling,
        never reserves a permanent gutter on Linux/Windows. */
     body.pga-welcome-mode {
       scrollbar-width: thin !important;
@@ -634,7 +634,7 @@ app_ui <- function() {
 
   welcome_content <- shiny::tagList(
 
-    # ── Hero ──────────────────────────────────────────────────────────────────
+    # -- Hero ------------------------------------------------------------------
     shiny::div(
       class = "pga-hero",
       # Left: text + CTA
@@ -668,7 +668,7 @@ app_ui <- function() {
             " Naffiou Kadiri and Vincent Manzanilla",
             shiny::tags$br(),
             shiny::tags$strong("Conception and supervision:", style = "color: #c8d0e8;"),
-            " Thierry de Meeûs"
+            " Thierry de Mee\u00fbs"
           )
         ),
         shiny::tags$button(
@@ -677,7 +677,7 @@ app_ui <- function() {
           shiny::icon("upload"), " Launch "
         )
       ),
-      # Right: big logo — reduced ~2.7x from its previous size
+      # Right: big logo - reduced ~2.7x from its previous size
       shiny::div(
         class = "pga-hero-logo",
         shiny::tags$img(
@@ -689,7 +689,7 @@ app_ui <- function() {
       )
     ),
 
-    # ── Partner logos footer ──────────────────────────────────────────────────
+    # -- Partner logos footer --------------------------------------------------
     shiny::div(
       class = "pga-footer",
       shiny::div(
@@ -705,7 +705,7 @@ app_ui <- function() {
           else
             shiny::tags$span(style = "font-weight:700;font-size:1.3rem;color:#26306B;letter-spacing:1px;", "INTERTRYP")
         ),
-        # Université de Montpellier
+        # Universite de Montpellier
         shiny::tags$a(
           href = "https://www.umontpellier.fr/en/", target = "_blank",
           style = "text-decoration:none;",
@@ -761,7 +761,7 @@ app_ui <- function() {
   # --- Help tab content ---
   ###
   help_content <- shiny::tagList(
-    module_banner("question-circle", "Help · Documentation",""),
+    module_banner("question-circle", "Help \u00b7 Documentation",""),
     shiny::fluidRow(
       shinydashboard::box(
         width = 12, solidHeader = FALSE,
@@ -780,16 +780,16 @@ app_ui <- function() {
             shiny::HTML(" <strong>PGA-cmdr accepts CSV and tabulation-delimited TXT files.</strong>
               The file must contain at least one <em>population</em> column and one or more
               <em>genetic marker</em> columns. Additional metadata columns (e.g. latitude,
-              longitude, individual ID) are optional and are simply ignored — the app only
+              longitude, individual ID) are optional and are simply ignored \u2014 the app only
               needs Population, optionally Latitude/Longitude, and the loci range.")
           ),
           shiny::tags$ul(
             style = "font-size:14px; line-height:1.9;",
             shiny::tags$li(shiny::tags$strong("Header row:"), " required (first row = column names)."),
-            shiny::tags$li(shiny::tags$strong("Separator:"), " comma (,), semicolon (;), or tab (\\t) — pick the one your file uses; the file loads automatically as soon as it is chosen, no extra click needed."),
+            shiny::tags$li(shiny::tags$strong("Separator:"), " comma (,), semicolon (;), or tab (\\t) \u2014 pick the one your file uses; the file loads automatically as soon as it is chosen, no extra click needed."),
             shiny::tags$li(shiny::tags$strong("Population column:"), " any column name; one value per individual."),
-            shiny::tags$li(shiny::tags$strong("Marker columns:"), " single-column (", shiny::tags$code("192/194"), ") or two-column (", shiny::tags$code("192"), " + ", shiny::tags$code("194"), ") encoding — detected automatically (see below)."),
-            shiny::tags$li(shiny::tags$strong("Missing data:"), " coded as ", shiny::tags$code("0"), " or ", shiny::tags$code("0/0"), " by default — customisable on import."),
+            shiny::tags$li(shiny::tags$strong("Marker columns:"), " single-column (", shiny::tags$code("192/194"), ") or two-column (", shiny::tags$code("192"), " + ", shiny::tags$code("194"), ") encoding \u2014 detected automatically (see below)."),
+            shiny::tags$li(shiny::tags$strong("Missing data:"), " coded as ", shiny::tags$code("0"), " or ", shiny::tags$code("0/0"), " by default \u2014 customisable on import."),
             shiny::tags$li(shiny::tags$strong("Upload limit:"), " 500 MB.")
           )
         ),

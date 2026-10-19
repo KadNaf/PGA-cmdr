@@ -5,7 +5,7 @@ mod_local_panmixia_ui <- function(id) {
   fluidPage(
     tags$head(gs_head()),
 
-    module_banner("flask", "Local Panmixia · FIS",""),
+    module_banner("flask", "Local Panmixia \u00b7 FIS",""),
 
     fluidRow(
       box(
@@ -45,7 +45,7 @@ mod_local_panmixia_ui <- function(id) {
       )
     ),
 
-    h2("FIS · By Locus \u00d7 Population", class = "section-title"),
+    h2("FIS \u00b7 By Locus \u00d7 Population", class = "section-title"),
 
     fluidRow(
       box(
