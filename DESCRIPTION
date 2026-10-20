@@ -17,18 +17,22 @@ Authors@R: c(
 BugReports: https://github.com/KadNaf/PGA-cmdr/issues
 URL: https://github.com/KadNaf/PGA-cmdr
 Description:
-    PGA-cmdr is an interactive Shiny application for population genetics
-    analyses based on multilocus individual genotype datasets. It provides
-    tools for data import and formatting, allele frequency and missing-data
-    exploration, general statistics (Na, Ne, Ho, He), local and global
-    panmixia (FIS, FIT), population subdivision (FST), and genetic
-    diversities (HS, HT), all based on the Weir & Cockerham (1984)
-    estimators. It also provides pairwise linkage disequilibrium testing,
-    null allele frequency estimation with ENA correction (Chapuis & Estoup
-    2007, FreeNA), and isolation-by-distance analysis with a Mantel test
-    (Rousset 1997). Confidence intervals and significance are obtained by
-    bootstrap resampling and Monte Carlo permutation, parallelised in C++
-    via Rcpp and OpenMP.
+    PGA-cmdr is an interactive 'shiny' application for population genetics
+    analyses of multilocus individual genotype data from codominant markers
+    (microsatellites, allozymes, SNPs). It covers data import and
+    formatting, allele frequencies and missing data, observed and expected
+    heterozygosity, F-statistics (FIS, FST, FIT) following Weir and
+    Cockerham (1984) <doi:10.1111/j.1558-5646.1984.tb05657.x>, and gene diversities (HS, HT)
+    following Nei and Chesser (1983) <doi:10.1111/j.1469-1809.1983.tb00993.x>.
+    Analyses include local and global panmixia tests, population subdivision with a G-based test of
+    genotypic differentiation, pairwise linkage disequilibrium tests, null
+    allele frequency estimation with the ENA correction of Chapuis and
+    Estoup (2007) <doi:10.1093/molbev/msl191>, and isolation by distance
+    using the regression of Rousset (1997) <doi:10.1093/genetics/145.4.1219> and a Mantel test. 
+    Confidence intervals are obtained by bootstrap over individuals, sub-samples or
+    loci, and p-values by Monte Carlo permutation, computed in parallel in
+    C++ via 'Rcpp' and 'OpenMP'. All computations run locally and no data
+    leave the user's computer.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Depends:
