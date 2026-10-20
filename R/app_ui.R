@@ -894,33 +894,27 @@ app_ui <- function() {
 
         shiny::tags$hr(),
 
-        # Mac installation note
+        # Installation & launch
         shiny::div(
           class = "pga-help-section",
-          shiny::tags$h3(shiny::icon("apple"), " macOS: prerequisites for installation"),
+          shiny::tags$h3(shiny::icon("download"), " Installation, launch and updates"),
           shiny::div(
             class = "pga-format-note",
-            shiny::icon("exclamation-triangle"),
-            shiny::HTML(" <strong>macOS users only.</strong> PGA-cmdr contains C++ code compiled with OpenMP.
-              Apple's default clang does <em>not</em> include OpenMP or gfortran.
-              Install the following before running <code>remotes::install_github()</code>:")
+            shiny::icon("info-circle"),
+            shiny::HTML(" PGA-cmdr is distributed through
+              <a href='https://kadnaf.r-universe.dev/pgacmdr' target='_blank' style='color:#6B64EF;'>R-universe</a>
+              as ready-to-use binaries for Windows, macOS and Linux &mdash; no compiler,
+              Rtools, gfortran or OpenMP setup is needed.")
           ),
           shiny::tags$ol(
             style = "font-size:14px; line-height:2.0;",
             shiny::tags$li(shiny::HTML(
-              "<strong>gfortran</strong> &mdash; required for R package compilation on macOS.<br>
-               Download the official R-project gfortran from
-               <a href='https://mac.r-project.org/tools/' target='_blank' style='color:#6B64EF;'>mac.r-project.org/tools</a>
-               and install <code>gfortran-14.2-universal.pkg</code> (or the current version)."
+              "<strong>Install</strong> (once, or to update to the latest version):<br>
+               <code>install.packages(\"pgacmdr\", repos = c(\"https://kadnaf.r-universe.dev\", \"https://cloud.r-project.org\"))</code>"
             )),
             shiny::tags$li(shiny::HTML(
-              "<strong>libomp</strong> &mdash; OpenMP runtime library, via Homebrew:<br>
-               <code>brew install libomp</code>"
-            )),
-            shiny::tags$li(shiny::HTML(
-              "(Apple Silicon only) Add to <code>~/.R/Makevars</code> (create the file if it does not exist):<br>
-               <code>LDFLAGS += -L/opt/homebrew/opt/libomp/lib -lomp</code><br>
-               <code>CPPFLAGS += -I/opt/homebrew/opt/libomp/include -Xclang -fopenmp</code>"
+              "<strong>Launch</strong> (every time you use the application):<br>
+               <code>pgacmdr::run_app()</code>"
             ))
           )
         ),

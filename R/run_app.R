@@ -4,7 +4,7 @@
 #' @return A \code{shiny.appobj} (invisibly).
 #' @examples
 #' \dontrun{
-#'   run_app()
+#'   pgacmdr::run_app()
 #' }
 #' @export
 run_app <- function(...) {

@@ -17,6 +17,6 @@ Run the PGA-cmdr application
 }
 \examples{
 \dontrun{
-  run_app()
+  pgacmdr::run_app()
 }
 }

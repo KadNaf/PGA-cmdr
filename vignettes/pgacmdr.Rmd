@@ -39,11 +39,23 @@ with everything you need -- there is nothing to preview or export
 separately first. The exact output file name(s) are always shown just
 above the Run button before you click it.
 
+## Installation
+
+PGA-cmdr is distributed through R-universe as ready-to-use binaries for
+Windows, macOS and Linux (no compiler needed). Install it once, or run the
+same command again to update to the latest version:
+
+```{r install}
+install.packages("pgacmdr",
+  repos = c("https://kadnaf.r-universe.dev", "https://cloud.r-project.org"))
+```
+
 ## Launch the application
 
+Every time you want to use the application:
+
 ```{r launch}
-library(pgacmdr)
-run_app()
+pgacmdr::run_app()
 ```
 
 The application opens in your default browser.

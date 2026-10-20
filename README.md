@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="\inst\app\www\LogoPGAcmdr.png" alt="PGA-cmdr" width="150"/>
+  <img src="inst/app/www/LogoPGAcmdr.png" alt="PGA-cmdr" width="150"/>
 </p>
 
 <p align="center">
@@ -16,47 +16,21 @@ distance — all computed locally, with no data leaving your machine.
 
 ## Installation
 
-All dependencies install automatically:
+PGA-cmdr is distributed through [R-universe](https://kadnaf.r-universe.dev/pgacmdr)
+as ready-to-use binaries for Windows, macOS and Linux: no compiler, Rtools,
+gfortran or OpenMP setup is needed. All dependencies install automatically.
 
 ```r
-install.packages("remotes")
+# 1) Installation (once, or to update to the latest version)
+install.packages("pgacmdr",
+  repos = c("https://kadnaf.r-universe.dev", "https://cloud.r-project.org"))
 
-remotes::install_github("KadNaf/PGA-cmdr")
-
+# 2) Launch the application (every time you use it)
 pgacmdr::run_app()
 ```
 
-### macOS prerequisites (compile from source)
-
-PGA-cmdr contains C++ code compiled with OpenMP. Apple clang does **not**
-include OpenMP or gfortran by default. Install these **before** running
-`remotes::install_github()`:
-
-**1. gfortran** — download from <https://mac.r-project.org/tools/> and
-install `gfortran-14.2-universal.pkg` (or the current version).
-
-**2. libomp** — OpenMP runtime:
-
-```bash
-brew install libomp
-```
-
-**3. Apple Silicon only** — add to `~/.R/Makevars` (create the file if
-absent):
-
-```
-LDFLAGS += -L/opt/homebrew/opt/libomp/lib -lomp
-CPPFLAGS += -I/opt/homebrew/opt/libomp/include -Xclang -fopenmp
-```
-
-## Docker
-
-```bash
-git clone https://github.com/KadNaf/PGA-cmdr.git
-cd PGA1
-docker compose up
-# open http://localhost:3838
-```
+The application opens in your default web browser. To update PGA-cmdr,
+simply run step 1 again.
 
 ## Modules
 
