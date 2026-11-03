@@ -222,9 +222,18 @@ static inline void permute_within_pops_once_rng_buf(
 // ============================================================================
 // Pointer-based WC84 locus stats (a,b,c + Ho/Hs/Ht)
 // ============================================================================
+// boot_pop_corr = true is used ONLY for the replicates of the bootstrap over
+// sub-samples (populations resampled as blocks). Resampling populations with
+// replacement makes duplicated populations count as distinct but identical
+// units, so the among-population variance s2 of a replicate has expectation
+// (r-1)/r * s2_observed (Davison & Hinkley 1997, sect. 3.8). We rescale it by
+// r/(r-1) so that E*[replicate] ~ observed. For HT the same effect inflates
+// sum(pbar^2) by sum(var_a)/r, which is removed. Never used for observed values
+// or permutations.
 static inline WC84LocusStats wc84_locus_stats_ptr_ld(
     const int* dat_ptr, int n_used, int ld, int p,
-    int locus_col, int pop_col, int missing_code, int base
+    int locus_col, int pop_col, int missing_code, int base,
+    bool boot_pop_corr = false
 ) {
   (void)p;
   
@@ -312,7 +321,9 @@ static inline WC84LocusStats wc84_locus_stats_ptr_ld(
       if (it != acount[i].end()) pi = (double)it->second / (2.0 * (double)n_i[i]);
       s2_num += (double)n_i[i] * (pi - pbar) * (pi - pbar);
     }
-    const double s2 = s2_num / ((double)(r - 1) * n_bar);
+    double s2 = s2_num / ((double)(r - 1) * n_bar);
+    const double s2_unc = s2;   // replicate value before rescaling
+    if (boot_pop_corr) s2 *= (double)r / (double)(r - 1);
     
     double hbar = 0.0;
     for (int i = 0; i < r; ++i) {
@@ -321,7 +332,10 @@ static inline WC84LocusStats wc84_locus_stats_ptr_ld(
     }
     hbar /= n_total;
     
-    const double term = pbar * (1.0 - pbar);
+    // Duplicated populations also make pbar(1-pbar) of a replicate too small by
+    // Var*(pbar) = s2_unc / r; add it back (bootstrap-world unbiasing).
+    double term = pbar * (1.0 - pbar);
+    if (boot_pop_corr) term += s2_unc / (double)r;
     
     const double a = (n_bar / n_c) *
       (s2 - (1.0 / (n_bar - 1.0)) *
@@ -393,11 +407,24 @@ static inline WC84LocusStats wc84_locus_stats_ptr_ld(
         }
       }
       double sum_p2 = 0.0;
+      double sum_var = 0.0;   // only used when boot_pop_corr
       for (auto &kv : pbar) {
         const double p = kv.second / (double)r_active;
         sum_p2 += p * p;
+        if (boot_pop_corr && r_active > 1) {
+          double ss = 0.0;
+          for (int pi = 0; pi < r; ++pi) {
+            if (n_i[pi] <= 0) continue;
+            double pia = 0.0;
+            auto itp = acount[pi].find(kv.first);
+            if (itp != acount[pi].end()) pia = (double)itp->second / (2.0 * (double)n_i[pi]);
+            ss += (pia - p) * (pia - p);
+          }
+          sum_var += ss / (double)(r_active - 1);
+        }
       }
       Ht = 1.0 - sum_p2;
+      if (boot_pop_corr && r_active > 1) Ht += sum_var / (double)r_active;
       // unbiased correction using total n across all individuals
       const double denom_tot = 2.0 * (double)total_n;
       if (denom_tot > 1.0) Ht *= (denom_tot / (denom_tot - 1.0));
@@ -412,12 +439,13 @@ static inline WC84LocusStats wc84_locus_stats_ptr_ld(
 static inline void wc84_fst_hs_ht_all_loci_ptr_ld(
     const int* dat_ptr, int n_used, int ld, int p,
     int pop_col, int missing_code, int base,
-    double* fst_out, double* hs_out, double* ht_out
+    double* fst_out, double* hs_out, double* ht_out,
+    bool boot_pop_corr = false
 ) {
   int out_col = 0;
   for (int j = 0; j < p; ++j) {
     if (j == pop_col) continue;
-    WC84LocusStats s = wc84_locus_stats_ptr_ld(dat_ptr, n_used, ld, p, j, pop_col, missing_code, base);
+    WC84LocusStats s = wc84_locus_stats_ptr_ld(dat_ptr, n_used, ld, p, j, pop_col, missing_code, base, boot_pop_corr);
     if (!s.ok) {
       fst_out[out_col] = NA_REAL;
       hs_out[out_col]  = NA_REAL;
@@ -434,14 +462,15 @@ static inline void wc84_fst_hs_ht_all_loci_ptr_ld(
 
 static inline double fst_overall_ratio_of_sums_ptr_ld(
     const int* dat_ptr, int n_used, int ld, int p,
-    int pop_col, int missing_code, int base
+    int pop_col, int missing_code, int base,
+    bool boot_pop_corr = false
 ) {
   double A = 0.0, D = 0.0;
   
   for (int j = 0; j < p; ++j) {
     if (j == pop_col) continue;
     
-    WC84LocusStats s = wc84_locus_stats_ptr_ld(dat_ptr, n_used, ld, p, j, pop_col, missing_code, base);
+    WC84LocusStats s = wc84_locus_stats_ptr_ld(dat_ptr, n_used, ld, p, j, pop_col, missing_code, base, boot_pop_corr);
     if (!s.ok) continue;
     
     const double denom = s.a + s.b + s.c;
@@ -949,10 +978,11 @@ static void boot_popblock_kernel_parallel_rfree(
     wc84_fst_hs_ht_all_loci_ptr_ld(
       mbuf.data(), n_used, ld, p,
       pop_col, missing_code, base,
-      fst_tmp.data(), hs_tmp.data(), ht_tmp.data()
+      fst_tmp.data(), hs_tmp.data(), ht_tmp.data(),
+      /*boot_pop_corr=*/true
     );
     
-    const double fst_overall = fst_overall_ratio_of_sums_ptr_ld(mbuf.data(), n_used, ld, p, pop_col, missing_code, base);
+    const double fst_overall = fst_overall_ratio_of_sums_ptr_ld(mbuf.data(), n_used, ld, p, pop_col, missing_code, base, /*boot_pop_corr=*/true);
     const double hs_overall  = mean_across_loci_ptr(hs_tmp.data(), L);
     const double ht_overall  = mean_across_loci_ptr(ht_tmp.data(), L);
     

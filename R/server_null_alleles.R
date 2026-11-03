@@ -313,7 +313,10 @@ server_null_alleles <- function(id, rv) {
     }
 
     # -- Weir & Cockerham (1984) FST components ----------------------------------
-    weir_components_allele <- function(pop_list, use_corr = FALSE) {
+    # boot_subs = TRUE only for the replicates of the bootstrap over sub-samples:
+    # duplicated populations bias the among-population mean square MSP by (r-1)/r,
+    # so it is rescaled by r/(r-1) (Davison & Hinkley 1997, sect. 3.8).
+    weir_components_allele <- function(pop_list, use_corr = FALSE, boot_subs = FALSE) {
       r     <- length(pop_list)
       N_tot <- sum(sapply(pop_list, `[[`, "ni"))
       N2    <- sum(sapply(pop_list, function(p) p$ni^2))
@@ -327,6 +330,7 @@ server_null_alleles <- function(id, rv) {
       MSG  <- (0.5*snA - sAA) / N_tot
       MSI  <- (0.5*snA + sAA - s2A) / (N_tot - r)
       MSP  <- (s2A - 0.5*snA^2/N_tot) / (r - 1)
+      if (isTRUE(boot_subs)) MSP <- MSP * r / (r - 1)
       list(s2P=(MSP-MSI)/(2*nc), s2I=0.5*(MSI-MSG), s2G=MSG)
     }
 
@@ -402,7 +406,7 @@ server_null_alleles <- function(id, rv) {
     # ??????????????????????????????????????????????????????????????????????????
     #  GLOBAL FST (raw + ENA), with per-locus accumulators kept for bootstrap
     # ??????????????????????????????????????????????????????????????????????????
-    compute_fst_global_full <- function(em_res) {
+    compute_fst_global_full <- function(em_res, boot_subs = FALSE) {
       markers <- names(em_res); pops <- names(em_res[[markers[1]]])
       s1_vec <- s3_vec <- s1c_vec <- s3c_vec <- numeric(length(markers))
       rows <- vector("list", length(markers))
@@ -425,7 +429,7 @@ server_null_alleles <- function(id, rv) {
             AA <- if (a_chr %in% names(e$H_ii)) e$H_ii[[a_chr]] else 0L
             list(ni=ni, nA=pf*2L*ni, AA=AA, AA_corr=AA)
           })
-          cmp <- weir_components_allele(pop_raw, use_corr=FALSE)
+          cmp <- weir_components_allele(pop_raw, use_corr=FALSE, boot_subs=boot_subs)
           s1l <- s1l+cmp$s2P; s3l <- s3l+cmp$s2P+cmp$s2I+cmp$s2G
           pop_ena <- lapply(pops, function(p) {
             e <- em_loc[[p]]; ni <- max(0L,e$efpop-e$n_absent)
@@ -434,7 +438,7 @@ server_null_alleles <- function(id, rv) {
             d  <- pf+2.0*e$rd; AAc <- if (AA>0&&d>0) AA*(pf/d) else 0.0
             list(ni=ni, nA=pf*2L*ni, AA=AA, AA_corr=AAc)
           })
-          cmpc <- weir_components_allele(pop_ena, use_corr=TRUE)
+          cmpc <- weir_components_allele(pop_ena, use_corr=TRUE, boot_subs=boot_subs)
           s1lc <- s1lc+cmpc$s2P; s3lc <- s3lc+cmpc$s2P+cmpc$s2I+cmpc$s2G
         }
         fst_loc  <- if (s3l  != 0) s1l /s3l  else NA_real_
@@ -784,7 +788,7 @@ server_null_alleles <- function(id, rv) {
             paste0("rep", seq_along(samp_pops))  # unique slot names, duplicates allowed
           )
         }
-        fg <- compute_fst_global_full(em_b)
+        fg <- compute_fst_global_full(em_b, boot_subs = TRUE)
         boot_raw[b] <- fg$global_raw %||% NA_real_
         boot_ena[b] <- fg$global_ena %||% NA_real_
         boot_raw_loc[b, ] <- fg$per_locus$FST_raw
@@ -1432,14 +1436,17 @@ server_null_alleles <- function(id, rv) {
         }
         df$Dgeo_m <- mapply(get_d, df$Pop1, df$Pop2)
         df$lnDgeo <- ifelse(df$Dgeo_m > 0, log(df$Dgeo_m), NA_real_)
-      } else {
-        df$Dgeo_m <- NA_real_; df$lnDgeo <- NA_real_
       }
+      # Without GPS coordinates the table is still produced (FST, FST-ENA,
+      # DCSE, DCSE-INA, FR); only the D_geo / ln(D_geo) columns are omitted.
       df
     })
 
+    # The pairwise table (FST, FST-ENA, DCSE, DCSE-INA, FR per pair) does not
+    # depend on GPS data, so it is always produced; D_geo and ln(D_geo) are only
+    # added when GPS coordinates are available.
     include_pairwise_r <- reactive({
-      isTRUE(gps_available_r())
+      TRUE
     })
 
     n_files_r <- reactive({ if (isTRUE(include_pairwise_r())) 6L else 5L })
@@ -1455,7 +1462,7 @@ server_null_alleles <- function(id, rv) {
       tags$div(class = "pga-module-card na-filecard", style = "margin-bottom:14px; max-width:400px;",
         # tags$div(class = "card-icon", icon("route")),
         h5("Full pairwise table"),
-        p("FST, FST-ENA, DCSE, DCSE-INA, F", tags$sub("R"), ", D_geo and ln(D_geo) \u2014 one row per pair."),
+        p("FST, FST-ENA, DCSE, DCSE-INA and F", tags$sub("R"), " (plus D_geo and ln(D_geo) when GPS coordinates are given) \u2014 one row per pair."),
         tags$div(class = "fname", uiOutput(session$ns("ui_filename_7"), inline = TRUE)),
         uiOutput(session$ns("ui_dl_file7"))
       )
@@ -1506,7 +1513,7 @@ server_null_alleles <- function(id, rv) {
     # ??????????????????????????????????????????????????????????????????????????
     file7_data <- reactive({
       shiny::req(include_pairwise_r())
-      list(header = meta_header(results_r(), "Full pairwise table (FST, FST-ENA, DCSE, DCSE-INA, FR, D_geo, ln(D_geo))"),
+      list(header = meta_header(results_r(), if (isTRUE(gps_available_r())) "Full pairwise table (FST, FST-ENA, DCSE, DCSE-INA, FR, D_geo, ln(D_geo))" else "Full pairwise table (FST, FST-ENA, DCSE, DCSE-INA, FR; no GPS coordinates, so no D_geo)"),
            data   = full_pairwise_r())
     })
 

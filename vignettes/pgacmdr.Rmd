@@ -175,7 +175,12 @@ of replicates:
 
 - `_indiv`: bootstrap over individuals (resampled within each sample);
 - `_subs`: bootstrap over sub-samples (populations resampled as blocks), by
-  locus;
+  locus. A population drawn twice counts as a distinct but identical unit and
+  shrinks the among-population variance of the replicate by (r-1)/r; each
+  replicate is rescaled by r/(r-1) (and the matching bias of the pooled allele
+  frequencies is removed for HT) so that the replicates are centred on the
+  observed value (Davison & Hinkley 1997). Observed values and permutation
+  tests are not affected;
 - `_loci`: bootstrap over loci, for the Overall row and for each population.
 
 P-values are two-sided permutation p-values. Fewer than 5 sub-samples or

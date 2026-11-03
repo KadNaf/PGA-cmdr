@@ -952,7 +952,7 @@ app_ui <- function() {
                 shiny::tags$strong("F-statistics (WC84)"),
                 shiny::tags$p(style = "font-size:13px; margin:6px 0 0; line-height:1.7;",
                   "FIS, FST and FIT are estimated following the unbiased moment estimators of ",
-                  shiny::tags$strong("Weir & Cockerham (1984)"), ". These estimators are robust to unequal sample sizes across populations and loci. Confidence intervals are computed by non-parametric bootstrap over loci and over sub-samples; p-values by permutation."),
+                  shiny::tags$strong("Weir & Cockerham (1984)"), ". These estimators are robust to unequal sample sizes across populations and loci. Confidence intervals are computed by non-parametric bootstrap over loci and over sub-samples; p-values by permutation. Bootstrap over sub-samples resamples whole populations. A population drawn twice counts as a distinct but identical unit, which shrinks the among-population variance of the replicate by (r-1)/r; each replicate is therefore rescaled by r/(r-1) (and the matching bias of the pooled allele frequencies is removed for HT), so that the replicates are centred on the observed value (Davison & Hinkley 1997, section 3.8). Observed values and permutation tests are not affected."),
                 shiny::tags$p(style = "font-size:12px; margin:4px 0 0; color:#777;",
                   "Weir BS, Cockerham CC. 1984. Estimating F-statistics for the analysis of population structure. Evolution 38:1358-1370.")
               ),

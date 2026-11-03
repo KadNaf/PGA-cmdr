@@ -71,6 +71,11 @@ List boot_subsamples_fst_cpp(List perLocusData, int nboot) {
     double MSG = (0.5 * snA - sAA) / N;
     double MSI = (0.5 * snA + sAA - s2A) / (N - r_eff);
     double MSP = (s2A - 0.5 * snA * snA / N) / (r_eff - 1.0);
+    // Resampling populations with replacement duplicates some of them, which
+    // makes the replicate's among-population mean square too small by (r-1)/r
+    // (Davison & Hinkley 1997, sect. 3.8): rescale it so that the replicates
+    // are centred on the observed value. Only the bootstrap uses this function.
+    MSP *= r_eff / (r_eff - 1.0);
     s2P = (MSP - MSI) / (2.0 * nc);
     s2I = 0.5 * (MSI - MSG);
     s2G = MSG;
