@@ -1550,3 +1550,135 @@ List boot_indiv_hs_cpp(
     _["n_boot"]          = B
   );
 }
+
+// ============================================================================
+// Bootstrap over INDIVIDUALS within each sub-sample, for the full WC84 set.
+//
+// Individuals are resampled with replacement INSIDE each population (the
+// population structure and sizes are preserved), whole multilocus genotypes
+// are kept together, and FST, FIT, FIS, HS, HT are recomputed for every locus
+// and for the multilocus (ratio-of-sums) estimate at every replicate.
+// This is the same resampling scheme as the FIS bootstrap over individuals.
+// Replicates are returned raw (no bias shift); see the R side for the
+// percentile interval and the optional bias shift.
+// ============================================================================
+// [[Rcpp::export]]
+List boot_indiv_wc84_cpp(
+    const IntegerMatrix& dat,
+    int pop_col_1based = 1,
+    int missing_code   = 0,
+    int base           = 1000,
+    int B              = 1000,
+    double seed        = 1.0,
+    int n_threads      = 1
+) {
+  const int n = dat.nrow();
+  const int p = dat.ncol();
+  if (p < 2) stop("Need at least 2 columns.");
+  if (B <= 0) stop("B must be positive.");
+  if (base <= 1) stop("base must be > 1.");
+
+  const int pop_col = pop_col_1based - 1;
+  if (pop_col < 0 || pop_col >= p) stop("pop_col out of range.");
+  const int L = p - 1;
+
+  std::vector<std::vector<int>> pop_rows = build_pop_rows(dat, pop_col);
+  const int P = (int)pop_rows.size();
+  if (P < 2) stop("Need at least 2 populations.");
+
+  const uint64_t seed0 = seed0_from_double(seed);
+
+  const size_t BL = (size_t)B * (size_t)L;
+  std::vector<double> fst_buf(BL, NA_REAL), fit_buf(BL, NA_REAL), fis_buf(BL, NA_REAL),
+                      hs_buf(BL, NA_REAL),  ht_buf(BL, NA_REAL);
+  std::vector<double> fst_ov((size_t)B, NA_REAL), fit_ov((size_t)B, NA_REAL), fis_ov((size_t)B, NA_REAL),
+                      hs_ov((size_t)B, NA_REAL),  ht_ov((size_t)B, NA_REAL);
+
+  int T = std::max(1, n_threads);
+#ifndef _OPENMP
+  T = 1;
+#endif
+#ifdef _OPENMP
+  omp_set_num_threads(T);
+#pragma omp parallel
+#endif
+  {
+    std::vector<int> mbuf((size_t)n * (size_t)p);
+
+#ifdef _OPENMP
+#pragma omp for schedule(static)
+#endif
+    for (int b = 0; b < B; ++b) {
+      const uint64_t sb = seed0 + 0x9e3779b97f4a7c15ULL * (uint64_t)(b + 1);
+      std::mt19937_64 rng(sb);
+
+      int rr = 0;
+      for (int k = 0; k < P; ++k) {
+        const auto& rows = pop_rows[(size_t)k];
+        const int nk = (int)rows.size();
+        if (nk == 0) continue;
+        std::uniform_int_distribution<int> U_indiv(0, nk - 1);
+        for (int i = 0; i < nk; ++i) {
+          const int rid = rows[(size_t)U_indiv(rng)];
+          for (int j = 0; j < p; ++j)
+            mat_set_colmajor(mbuf.data(), n, rr, j, mat_get_colmajor(dat.begin(), n, rid, j));
+          rr++;
+        }
+      }
+
+      double A = 0.0, Bs = 0.0, C = 0.0, hs_sum = 0.0, ht_sum = 0.0;
+      int n_ok = 0, n_h = 0;
+      const size_t row0 = (size_t)b * (size_t)L;
+      int out_col = 0;
+      for (int j = 0; j < p; ++j) {
+        if (j == pop_col) continue;
+        WC84LocusStats s = wc84_locus_stats_ptr_ld(mbuf.data(), rr, n, p, j, pop_col, missing_code, base);
+        if (s.ok) {
+          const double den = s.a + s.b + s.c, den_fis = s.b + s.c;
+          if (den > 0.0) {
+            fst_buf[row0 + out_col] = s.a / den;
+            fit_buf[row0 + out_col] = (s.a + s.b) / den;
+            A += s.a; Bs += s.b; C += s.c; ++n_ok;
+          }
+          if (den_fis > 0.0) fis_buf[row0 + out_col] = s.b / den_fis;
+          hs_buf[row0 + out_col] = s.Hs;
+          ht_buf[row0 + out_col] = s.Ht;
+          if (std::isfinite(s.Hs) && std::isfinite(s.Ht)) { hs_sum += s.Hs; ht_sum += s.Ht; ++n_h; }
+        }
+        ++out_col;
+      }
+      const double dA = A + Bs + C;
+      if (n_ok > 0 && dA > 0.0) {
+        fst_ov[(size_t)b] = A / dA;
+        fit_ov[(size_t)b] = (A + Bs) / dA;
+        if ((Bs + C) > 0.0) fis_ov[(size_t)b] = Bs / (Bs + C);
+      }
+      if (n_h > 0) { hs_ov[(size_t)b] = hs_sum / n_h; ht_ov[(size_t)b] = ht_sum / n_h; }
+    }
+  }
+
+  auto mk = [&](const std::vector<double>& src) {
+    NumericMatrix m(B, L);
+    for (int b = 0; b < B; ++b)
+      for (int l = 0; l < L; ++l) m(b, l) = src[(size_t)b * (size_t)L + (size_t)l];
+    return m;
+  };
+  CharacterVector loc_names;
+  locus_names_from_colnames(dat, pop_col, loc_names);
+  NumericMatrix FST = mk(fst_buf), FIT = mk(fit_buf), FIS = mk(fis_buf), HS = mk(hs_buf), HT = mk(ht_buf);
+  colnames(FST) = loc_names; colnames(FIT) = loc_names; colnames(FIS) = loc_names;
+  colnames(HS) = loc_names;  colnames(HT) = loc_names;
+
+  return List::create(
+    _["FST_boot"] = FST, _["FIT_boot"] = FIT, _["FIS_boot"] = FIS,
+    _["HS_boot"]  = HS,  _["HT_boot"]  = HT,
+    _["FST_overall_boot"] = NumericVector(fst_ov.begin(), fst_ov.end()),
+    _["FIT_overall_boot"] = NumericVector(fit_ov.begin(), fit_ov.end()),
+    _["FIS_overall_boot"] = NumericVector(fis_ov.begin(), fis_ov.end()),
+    _["HS_overall_boot"]  = NumericVector(hs_ov.begin(),  hs_ov.end()),
+    _["HT_overall_boot"]  = NumericVector(ht_ov.begin(),  ht_ov.end()),
+    _["locus_names"] = loc_names,
+    _["boot_type"]   = "individual",
+    _["n_boot"]      = B
+  );
+}

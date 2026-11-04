@@ -85,6 +85,10 @@ boot_indiv_hs_cpp <- function(dat, pop_col_1based = 1L, missing_code = 0L, base 
     .Call(`_pgacmdr_boot_indiv_hs_cpp`, dat, pop_col_1based, missing_code, base, B, seed, n_threads)
 }
 
+boot_indiv_wc84_cpp <- function(dat, pop_col_1based = 1L, missing_code = 0L, base = 1000L, B = 1000L, seed = 1.0, n_threads = 1L) {
+    .Call(`_pgacmdr_boot_indiv_wc84_cpp`, dat, pop_col_1based, missing_code, base, B, seed, n_threads)
+}
+
 g_test_subdivision_batch_cpp <- function(pop_idx0_full, loci_idx0, loci_allele0, loci_n_allele, n_pop, n_batch) {
     .Call(`_pgacmdr_g_test_subdivision_batch_cpp`, pop_idx0_full, loci_idx0, loci_allele0, loci_n_allele, n_pop, n_batch)
 }

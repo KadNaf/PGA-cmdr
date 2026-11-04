@@ -952,7 +952,7 @@ server_null_alleles <- function(id, rv) {
       # seed here makes a given run fully reproducible (same seed + same
       # data + same nboot => bit-identical CI every time, including in the
       # exported bootstrap-distribution file).
-      seed <- suppressWarnings(as.integer(input$boot_seed %||% 12345L))
+      seed <- suppressWarnings(as.integer(rv$seed %||% 12345L))
       if (!is.finite(seed)) seed <- 12345L
       set.seed(seed)
 
@@ -1419,9 +1419,9 @@ server_null_alleles <- function(id, rv) {
         df$DCSE_INA_lo <- NA_real_; df$DCSE_INA_hi <- NA_real_
       }
 
-      df$FR_INA    <- .linearise_na(df$FST_ENA)
-      df$FR_INA_lo <- .linearise_na(df$FST_ENA_lo)
-      df$FR_INA_hi <- .linearise_na(df$FST_ENA_hi)
+      df$FR_ENA    <- .linearise_na(df$FST_ENA)
+      df$FR_ENA_lo <- .linearise_na(df$FST_ENA_lo)
+      df$FR_ENA_hi <- .linearise_na(df$FST_ENA_hi)
       df$FR_raw    <- .linearise_na(df$FST_raw)
       df$FR_raw_lo <- .linearise_na(df$FST_raw_lo)
       df$FR_raw_hi <- .linearise_na(df$FST_raw_hi)

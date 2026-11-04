@@ -11,7 +11,7 @@ mod_local_panmixia_ui <- function(id) {
       box(
         width = 12,
         title = div(style = "background-color: #FFFFFF; padding: 10px; color: #333a43; font-weight: 600;",
-                    "FIS: CI & p-value parameters"),
+                    "FIS: CI & p-value parameters (one Run = one file with 4 tables)"),
         solidHeader = TRUE, status = "primary",
         fluidRow(
           column(3,
@@ -42,33 +42,6 @@ mod_local_panmixia_ui <- function(id) {
             )
           )
         )
-      )
-    ),
-
-    h2("FIS \u00b7 By Locus \u00d7 Population", class = "section-title"),
-
-    fluidRow(
-      box(
-        width = 12,
-        title = div(style = "background-color: #FFFFFF; padding: 10px; color: #333a43; font-weight: 600;",
-                    icon("table"),
-                    "FIS (WC84) per locus \u00d7 population"),
-        solidHeader = TRUE, status = "primary",
-        fluidRow(
-          column(3,
-            h4(icon("sliders"), "Parameters"),
-            numericInput(ns("fis_lp_n_perm"), "Number of Permutations:",
-                         value = 10000, min = 100, max = 20000)
-          ),
-          column(9,
-            br(),
-            uiOutput(ns("ui_fislp_out_status")),
-            downloadButton(ns("run_fis_locus_pop"), " Run",
-                         icon = icon("rocket"),
-                         class = "btn-action-primary btn-block", style = "font-weight: bold;")
-          )
-        ),
-        style = "padding: 10px;"
       )
     )
   )

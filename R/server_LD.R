@@ -225,7 +225,7 @@ server_LD <- function(id, rv) {
       nbperms <- as.integer(input$n_iterations)
       if (is.na(nbperms) || nbperms < 1L) nbperms <- 10000L
 
-      set.seed(1)
+      set.seed(as.integer(rv$seed %||% 1L))
       res_cpp <- tryCatch({
         ld_pvalues_cpp(Population = df$Population,
                        geno_mat   = geno_mat,

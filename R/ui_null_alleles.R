@@ -98,9 +98,8 @@ null_alleles_UI <- function(id) {
               label = "Alpha (between 0.9999 and 0.0001):",
               value = 0.05, min = 0.0001, max = 0.5, step = 0.01, width = "100%")),
           tags$div(style = "border-left:1px solid #dcdfe4; flex:1; min-width:190px; padding:0 16px;",
-            numericInput(ns("boot_seed"),
-              label = "Random seed (between 1 and 1000000):",
-              value = 12345, min = 1, max = 1000000, step = 1, width = "100%"))
+            tags$p(style = "color:#555;margin-top:6px;",
+              "Random seed: set once in the Import data tab (used by all analyses)."))
         ),
 
         tags$hr(),

@@ -700,7 +700,7 @@ server_isolation_by_distance <- function(id, rv) {
 
       n_perm <- as.integer(input$mt_n_perm)
       p_formula <- input$mt_p_formula %||% "plus1"
-      seed <- 67144630L  # fixed internal seed, not exposed to the user
+      seed <- as.integer(rv$seed %||% 12345L)  # global seed set in Import data
 
       # Recover BOTH the linear (raw-distance) and log-distance scale of a
       # distance-like column, from whichever one was actually picked, so

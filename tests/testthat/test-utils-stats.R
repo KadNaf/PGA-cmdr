@@ -110,12 +110,12 @@ test_that("table builders give the expected columns and Overall rows", {
   lb <- data.frame(Statistic = c("FST", "FIT", "FIS", "HS", "HT"), Observed = 1:5 / 10, Boot_Mean = 0,
                    SE = .01, CI_L = 0, CI_U = 1)
   s1 <- pga_fst_section(ft, lb)
-  expect_equal(s1$ID, c("L1", "L2", "Overall (BS/Ss)", "Overall (BS/Loci)"))
-  expect_named(s1, c("ID", "Observed_FST", "P_value", "CI_L", "CI_U"))
-  so <- data.frame(Statistic = c("FIS", "FST", "FIT", "HS", "HT"), CI_L_subs = 0, CI_U_subs = 1)
+  expect_equal(s1$ID, c("L1", "L2", "Overall (BS/Indiv)", "Overall (BS/Loci)"))
+  expect_named(s1, c("ID", "Observed_FST", "SE", "P_value", "P_theta_gt", "P_theta_lt", "CI_L", "CI_U"))
+  so <- data.frame(Statistic = c("FIS", "FST", "FIT", "HS", "HT"), SE_indiv = .01, CI_L_subs = 0, CI_U_subs = 1)
   ml <- pga_multilocus_section(lb, so)
   expect_equal(ml$Statistic, c("FIS", "FST", "FIT", "HS", "HT"))                      # FIS, FST, FIT order
-  expect_named(ml, c("Statistic", "Observed", "SE_loci", "CI_L_loci", "CI_U_loci", "CI_L_subs", "CI_U_subs"))
+  expect_named(ml, c("Statistic", "Observed", "SE_loci", "CI_L_loci", "CI_U_loci", "SE_indiv", "CI_L_indiv", "CI_U_indiv"))
 })
 
 

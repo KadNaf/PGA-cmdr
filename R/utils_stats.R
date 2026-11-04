@@ -336,26 +336,34 @@ pga_overall_by_population <- function(mat, base = 1000L, missing_code = 0L) {
 pga_fst_section <- function(final_table, locus_boot_table) {
   ft  <- final_table
   n   <- nrow(ft)
-  out <- ft[, c("ID", "Observed_FST", "P_value", "CI_L", "CI_U"), drop = FALSE]
-  out$ID[n] <- "Overall (BS/Ss)"
+  se  <- if ("SE" %in% names(ft)) ft$SE else rep(NA_real_, n)
+  pg <- if ("P_theta_gt" %in% names(ft)) ft$P_theta_gt else rep(NA_real_, n)
+  pl <- if ("P_theta_lt" %in% names(ft)) ft$P_theta_lt else rep(NA_real_, n)
+  out <- data.frame(ID = ft$ID, Observed_FST = ft$Observed_FST, SE = se,
+                    P_value = ft$P_value, P_theta_gt = pg, P_theta_lt = pl,
+                    CI_L = ft$CI_L, CI_U = ft$CI_U,
+                    stringsAsFactors = FALSE)
+  out$ID[n] <- "Overall (BS/Indiv)"
   lb  <- locus_boot_table[locus_boot_table$Statistic == "FST", , drop = FALSE]
   rbind(out, data.frame(ID = "Overall (BS/Loci)", Observed_FST = ft$Observed_FST[n],
-                        P_value = ft$P_value[n],
+                        SE = if (nrow(lb)) lb$SE else NA_real_,
+                        P_value = ft$P_value[n], P_theta_gt = pg[n], P_theta_lt = pl[n],
                         CI_L = if (nrow(lb)) lb$CI_L else NA_real_,
                         CI_U = if (nrow(lb)) lb$CI_U else NA_real_,
                         stringsAsFactors = FALSE))
 }
 
-# Multilocus estimators (FIS, FST, FIT, HS, HT): observed value, bootstrap standard
-# error and CI from the bootstrap over LOCI, and CI from the bootstrap over
-# SUB-SAMPLES (NA when fewer than 5 sub-samples).
-pga_multilocus_section <- function(locus_boot_table, subs_overall) {
-  ord <- c("FIS", "FST", "FIT", "HS", "HT")
+# Multilocus estimators (FIS, FST, FIT, HS, HT): observed value, standard error and
+# CI from the bootstrap over LOCI, and standard error and CI from the bootstrap
+# over INDIVIDUALS (bias-shifted).
+pga_multilocus_section <- function(locus_boot_table, subs_overall,
+                                   stats = c("FIS", "FST", "FIT", "HS", "HT")) {
+  ord <- stats
   lb  <- locus_boot_table[match(ord, locus_boot_table$Statistic), , drop = FALSE]
   sb  <- subs_overall[match(ord, subs_overall$Statistic), , drop = FALSE]
-  data.frame(Statistic = ord, Observed = lb$Observed, SE_loci = lb$SE,
-             CI_L_loci = lb$CI_L, CI_U_loci = lb$CI_U,
-             CI_L_subs = sb$CI_L_subs, CI_U_subs = sb$CI_U_subs,
+  data.frame(Statistic = ord, Observed = lb$Observed,
+             SE_loci = lb$SE, CI_L_loci = lb$CI_L, CI_U_loci = lb$CI_U,
+             SE_indiv = sb$SE_indiv, CI_L_indiv = sb$CI_L_subs, CI_U_indiv = sb$CI_U_subs,
              stringsAsFactors = FALSE)
 }
 
@@ -368,7 +376,7 @@ pga_diversity_section <- function(tbl, obs_col) {
   out
 }
 
-# HS per population: one row per population (bootstrap over individuals and over
+# HS per sub-sample: one row per sub-sample (bootstrap over individuals and over
 # loci) and an Overall row that carries the same two types of bootstrap.
 #   hs_per_pop : table of pga_hs_per_population()
 #   hs_indiv_tbl, locus_boot_table : tables of run_bootstrap_fst_analysis()
@@ -377,13 +385,15 @@ pga_hs_pop_section <- function(hs_per_pop, hs_indiv_tbl, locus_boot_table) {
   ov_l <- locus_boot_table[locus_boot_table$Statistic == "HS", , drop = FALSE]
   tab  <- hs_per_pop
   tab$N_loci <- NULL
-  rbind(tab, data.frame(
+  res <- rbind(tab, data.frame(
     Population  = "Overall",
     Observed_HS = ov_i$Observed_HS,
     SE_indiv    = ov_i$Boot_SE,
     CI_L_indiv  = ov_i$CI_L, CI_U_indiv = ov_i$CI_U,
     CI_L_loci   = ov_l$CI_L, CI_U_loci  = ov_l$CI_U,
     stringsAsFactors = FALSE))
+  names(res)[names(res) == "Population"] <- "Sub_sample"
+  res
 }
 
 # Writes a titled block of bootstrap replicate values (one row per replicate).
@@ -418,3 +428,135 @@ pga_n_le <- function(null, obs, tol = PGA_TIE_TOL) sum(null <= obs + tol)
 pga_n_gt <- function(null, obs, tol = PGA_TIE_TOL) sum(null > obs + tol)
 # two-sided: number of permuted |values| >= |observed| (ties included)
 pga_n_abs_ge <- function(null, obs, tol = PGA_TIE_TOL) sum(abs(null) >= abs(obs) - tol)
+
+
+# ---------------------------------------------------------------------------
+# Pairwise FST between sub-samples (Weir & Cockerham 1984), no GPS needed.
+#   For every pair of sub-samples: multilocus FST (ratio of sums) and per-locus FST,
+#   CI by bootstrap over INDIVIDUALS (bias-shifted, see pga_ci_bias_shift) and over
+#   LOCI, and a permutation p-value (individuals reassigned between the two
+#   sub-samples; p = (b + 1)/(m + 1), one-sided "greater" on FST).
+# Returns list(overall = data.frame, per_locus = data.frame).
+# ---------------------------------------------------------------------------
+pga_pairwise_fst <- function(mat, base = 1000L, n_boot = 1000L, n_perm = 1000L,
+                             conf_level = 0.95, seed = 1, missing_code = 0L,
+                             n_threads = 1L) {
+  mat <- as.matrix(mat); storage.mode(mat) <- "integer"
+  levels <- attr(mat, "pop_levels")
+  codes  <- sort(unique(mat[, 1]))
+  if (is.null(levels)) levels <- as.character(codes) else levels <- as.character(levels)
+  nm <- function(k) if (k <= length(levels)) levels[k] else as.character(k)
+  loc <- colnames(mat)[-1L]
+  if (is.null(loc)) loc <- paste0("L", seq_len(ncol(mat) - 1L))
+  ov <- list(); pl <- list(); k <- 0L
+  for (i in seq_len(length(codes) - 1L)) for (j in (i + 1L):length(codes)) {
+    if (j > length(codes)) next
+    k <- k + 1L
+    sub <- mat[mat[, 1] %in% codes[c(i, j)], , drop = FALSE]
+    sub[, 1] <- ifelse(sub[, 1] == codes[i], 1L, 2L)
+    n1 <- sum(sub[, 1] == 1L); n2 <- sum(sub[, 1] == 2L)
+    obs <- observed_wc84_stats_cpp(sub, 1L, as.integer(missing_code), as.integer(base))
+    comp <- wc84_locus_components_cpp(sub, 1L, as.integer(missing_code), as.integer(base))
+    bl <- pga_boot_over_loci(comp$A, comp$B, comp$C, comp$HS, comp$HT,
+                             n_boot = n_boot, conf_level = conf_level, seed = seed + k)$table
+    bl <- bl[bl$Statistic == "FST", ]
+    bi <- boot_indiv_wc84_cpp(sub, 1L, as.integer(missing_code), as.integer(base),
+                              as.integer(n_boot), as.numeric(seed + k), as.integer(n_threads))
+    ci_o <- pga_ci_bias_shift(obs$FST_overall_ratio_of_sums, bi$FST_overall_boot, conf_level)
+    p_o <- NA_real_; p_l <- rep(NA_real_, length(loc))
+    if (n_perm > 0) {
+      pr <- batch_permute_wc84_fst_auto(sub, 1L, as.integer(missing_code), as.integer(base),
+                                        B = as.integer(n_perm), n_threads = as.integer(n_threads),
+                                        seed = seed + k, pval_method = "greater",
+                                        perm_scheme = "permute_pop_labels", debug = FALSE)
+      p_o <- as.numeric(pr$p_FST_overall); p_l <- as.numeric(pr$p_G)
+    }
+    ov[[k]] <- data.frame(Sub_sample_1 = nm(codes[i]), Sub_sample_2 = nm(codes[j]),
+                          N1 = n1, N2 = n2, FST = obs$FST_overall_ratio_of_sums,
+                          SE_indiv = stats::sd(bi$FST_overall_boot, na.rm = TRUE),
+                          CI_L_indiv = ci_o[["lo"]], CI_U_indiv = ci_o[["hi"]],
+                          SE_loci = bl$SE, CI_L_loci = bl$CI_L, CI_U_loci = bl$CI_U,
+                          P_value = p_o, stringsAsFactors = FALSE)
+    ci_l <- vapply(seq_along(loc), function(q)
+      pga_ci_bias_shift(obs$FST[q], bi$FST_boot[, q], conf_level), numeric(2))
+    pl[[k]] <- data.frame(Sub_sample_1 = nm(codes[i]), Sub_sample_2 = nm(codes[j]),
+                          Locus = loc, FST = as.numeric(obs$FST),
+                          SE_indiv = apply(bi$FST_boot, 2, stats::sd, na.rm = TRUE),
+                          CI_L_indiv = ci_l[1, ], CI_U_indiv = ci_l[2, ],
+                          P_value = p_l, stringsAsFactors = FALSE)
+  }
+  list(overall = do.call(rbind, ov), per_locus = do.call(rbind, pl))
+}
+
+
+# ---------------------------------------------------------------------------
+# FIS (WC84) per locus x sub-sample, with CI and p-values.
+#   For every sub-sample: observed FIS at each locus, CI by bootstrap over
+#   INDIVIDUALS (individuals resampled with replacement inside the sub-sample),
+#   two-sided permutation p-value and the two one-sided ones (FSTAT: heterozygote
+#   deficit = permuted FIS >= observed; excess = permuted FIS <= observed).
+# Returns a long data.frame: Locus, Sub_sample, N, FIS, SE, CI_L, CI_U,
+#   P_value, P_deficit, P_excess.  CI is NA when the sub-sample has < 5 individuals.
+# ---------------------------------------------------------------------------
+pga_fis_locus_pop <- function(mat, base = 1000L, pop_names = NULL, n_boot = 1000L,
+                              n_perm = 1000L, conf_level = 0.95, seed = 1) {
+  mat <- as.matrix(mat); storage.mode(mat) <- "integer"
+  loc <- colnames(mat)[-1L]
+  codes <- sort(unique(mat[, 1]))
+  if (is.null(pop_names)) pop_names <- as.character(codes)
+  out <- vector("list", length(codes))
+  for (k in seq_along(codes)) {
+    sub <- mat[mat[, 1] == codes[k], , drop = FALSE]; sub[, 1] <- 1L
+    n <- nrow(sub)
+    obs <- as.numeric(fis_wc_cpp(sub, base = as.integer(base))$FIS)
+    se <- cl <- cu <- rep(NA_real_, length(loc))
+    if (n >= 5L && n_boot > 0) {
+      set.seed(as.integer((seed + k) %% .Machine$integer.max))
+      reps <- matrix(NA_real_, n_boot, length(loc))
+      for (b in seq_len(n_boot))
+        reps[b, ] <- as.numeric(fis_wc_cpp(sub[sample.int(n, n, replace = TRUE), , drop = FALSE],
+                                           base = as.integer(base))$FIS)
+      for (j in seq_along(loc)) {
+        ci <- pga_ci(reps[, j], conf_level); cl[j] <- ci[["lo"]]; cu[j] <- ci[["hi"]]
+        se[j] <- stats::sd(reps[, j], na.rm = TRUE)
+      }
+    }
+    p2 <- pd <- pe <- rep(NA_real_, length(loc))
+    if (n >= 2L && n_perm > 0) {
+      set.seed(as.integer((seed + k) %% .Machine$integer.max))
+      perm <- batch_permute_wc_fis(dat = sub, pop_col_1based = 1L, base = as.integer(base),
+                                   B = as.integer(n_perm))
+      perm <- perm[, seq_along(loc), drop = FALSE]
+      for (j in seq_along(loc)) {
+        if (!is.finite(obs[j])) next
+        pj <- perm[, j]; pj <- pj[is.finite(pj)]
+        if (!length(pj)) next
+        m <- length(pj)
+        p2[j] <- (pga_n_abs_ge(pj, obs[j]) + 1) / (m + 1)
+        pd[j] <- (pga_n_ge(pj, obs[j]) + 1) / (m + 1)
+        pe[j] <- (pga_n_le(pj, obs[j]) + 1) / (m + 1)
+      }
+    }
+    out[[k]] <- data.frame(Locus = loc, Sub_sample = pop_names[k], N = n, FIS = obs, SE = se,
+                           CI_L = cl, CI_U = cu, P_value = p2, P_deficit = pd, P_excess = pe,
+                           stringsAsFactors = FALSE)
+  }
+  do.call(rbind, out)
+}
+
+
+# Moves the standard-error columns (SE, SE_*, Boot_SE) and then the p-value columns
+# (P_value, P_*, p_*) to the END of a table, so that the numeric columns that are
+# plotted (estimate, CI bounds) stay contiguous in a spreadsheet.
+pga_se_p_last <- function(df) {
+  if (!is.data.frame(df)) return(df)
+  nm <- names(df)
+  is_se <- grepl("^(SE($|_)|Boot_SE$)", nm)
+  is_p  <- grepl("^[Pp]_", nm) | nm %in% c("P_value", "p_value")
+  df[, c(nm[!is_se & !is_p], nm[is_se], nm[is_p]), drop = FALSE]
+}
+
+# write.table() with tab separation, SE and p-value columns last.
+pga_write_table <- function(x, file, ...) {
+  utils::write.table(pga_se_p_last(x), file = file, sep = "\t", row.names = FALSE, quote = FALSE)
+}

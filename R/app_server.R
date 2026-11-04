@@ -7,7 +7,8 @@ app_server <- function(input, output, session) {
   rv <- shiny::reactiveValues(
     raw            = NULL,
     data           = NULL,
-    formatted_data = NULL
+    formatted_data = NULL,
+    seed           = 12345L   # global random seed, set in Import data
   )
 
   server_import_data("import",        rv)

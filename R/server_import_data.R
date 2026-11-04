@@ -5,6 +5,11 @@ server_import_data <- function(id, rv) {
     rv$preview_raw  <- NULL
     rv$preview_meta <- NULL
     uploaded_file <- shiny::reactiveVal(NULL)
+    # Global random seed: one value for every module (bootstraps, permutations, Mantel, LD).
+    shiny::observe({
+      sd <- suppressWarnings(as.integer(input$seed))
+      rv$seed <- if (length(sd) == 1L && is.finite(sd) && sd >= 1L) sd else 12345L
+    })
     
     
     

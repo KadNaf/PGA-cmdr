@@ -59,10 +59,12 @@ import_data_ui <- function(id) {
           solidHeader = TRUE,
           footer = tagList("* mandatory fields", tags$br(), "Check column numbers below."),
 
-          selectizeInput(ns("pop_data"),       "Population name*",    choices = NULL, options = list(placeholder = "select")),
+          selectizeInput(ns("pop_data"),       "Column name for sub-samples*",    choices = NULL, options = list(placeholder = "select")),
           selectizeInput(ns("latitude_data"),  "Latitude",            choices = NULL, options = list(placeholder = "select")),
           selectizeInput(ns("longitude_data"), "Longitude",           choices = NULL, options = list(placeholder = "select")),
           tags$hr(),
+          numericInput(ns("seed"), "Random seed (between 1 and 1000000), used by all analyses:",
+                       value = 12345, min = 1, max = 1000000, step = 1),
           fluidRow(
             column(6,
               numericInput(ns("n_loci"), "Number of loci*", value = NA, min = 1, step = 1),

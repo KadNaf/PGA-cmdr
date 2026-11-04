@@ -323,6 +323,23 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// boot_indiv_wc84_cpp
+List boot_indiv_wc84_cpp(const IntegerMatrix& dat, int pop_col_1based, int missing_code, int base, int B, double seed, int n_threads);
+RcppExport SEXP _pgacmdr_boot_indiv_wc84_cpp(SEXP datSEXP, SEXP pop_col_1basedSEXP, SEXP missing_codeSEXP, SEXP baseSEXP, SEXP BSEXP, SEXP seedSEXP, SEXP n_threadsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const IntegerMatrix& >::type dat(datSEXP);
+    Rcpp::traits::input_parameter< int >::type pop_col_1based(pop_col_1basedSEXP);
+    Rcpp::traits::input_parameter< int >::type missing_code(missing_codeSEXP);
+    Rcpp::traits::input_parameter< int >::type base(baseSEXP);
+    Rcpp::traits::input_parameter< int >::type B(BSEXP);
+    Rcpp::traits::input_parameter< double >::type seed(seedSEXP);
+    Rcpp::traits::input_parameter< int >::type n_threads(n_threadsSEXP);
+    rcpp_result_gen = Rcpp::wrap(boot_indiv_wc84_cpp(dat, pop_col_1based, missing_code, base, B, seed, n_threads));
+    return rcpp_result_gen;
+END_RCPP
+}
 // g_test_subdivision_batch_cpp
 List g_test_subdivision_batch_cpp(IntegerVector pop_idx0_full, List loci_idx0, List loci_allele0, IntegerVector loci_n_allele, int n_pop, int n_batch);
 RcppExport SEXP _pgacmdr_g_test_subdivision_batch_cpp(SEXP pop_idx0_fullSEXP, SEXP loci_idx0SEXP, SEXP loci_allele0SEXP, SEXP loci_n_alleleSEXP, SEXP n_popSEXP, SEXP n_batchSEXP) {
@@ -419,6 +436,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_pgacmdr_batch_permute_wc84_fst_parallel", (DL_FUNC) &_pgacmdr_batch_permute_wc84_fst_parallel, 9},
     {"_pgacmdr_boot_popblock_wc84_parallel", (DL_FUNC) &_pgacmdr_boot_popblock_wc84_parallel, 7},
     {"_pgacmdr_boot_indiv_hs_cpp", (DL_FUNC) &_pgacmdr_boot_indiv_hs_cpp, 7},
+    {"_pgacmdr_boot_indiv_wc84_cpp", (DL_FUNC) &_pgacmdr_boot_indiv_wc84_cpp, 7},
     {"_pgacmdr_g_test_subdivision_batch_cpp", (DL_FUNC) &_pgacmdr_g_test_subdivision_batch_cpp, 6},
     {"_pgacmdr_g_test_subdivision_observed_cpp", (DL_FUNC) &_pgacmdr_g_test_subdivision_observed_cpp, 5},
     {"_pgacmdr_ld_pvalues_cpp", (DL_FUNC) &_pgacmdr_ld_pvalues_cpp, 5},
