@@ -655,7 +655,7 @@ app_ui <- function() {
           shiny::tags$p(
             style = "color: #A9F0D8; font-size: 25px; font-family: Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif; margin: 0; line-height: 1.5;",
             "A Versatile, user-friendly and multi-OS application", shiny::tags$br(),
-          "to analyse population genetic data"
+          "to analyse population genetics data"
           )
         ),
         #
@@ -748,7 +748,11 @@ app_ui <- function() {
               style = "opacity:0.9;")
           else
             shiny::tags$span(style = "font-weight:700;font-size:1.3rem;color:#26306B;letter-spacing:1px;", "UCAD")
-        )
+        ),
+        # Release date, next to the logos
+        shiny::tags$span(
+          style = "font-size:1.15rem;font-weight:600;color:#26306B;white-space:nowrap;",
+          "December 2026")
       ),
       shiny::tags$div(
         class = "pga-footer-caption",
@@ -767,242 +771,14 @@ app_ui <- function() {
         width = 12, solidHeader = FALSE,
         title = shiny::div(
           style = "background:#FFFFFF; padding:10px; color:#333a43; font-weight:600;",
-          shiny::icon("file-alt"), " Data requirements"
+          shiny::icon("file-pdf"), " User guide"
         ),
-
-        # Format overview
-        shiny::div(
-          class = "pga-help-section",
-          shiny::tags$h3(shiny::icon("table"), " Accepted file formats"),
-          shiny::div(
-            class = "pga-format-note",
-            shiny::icon("info-circle"),
-            shiny::HTML(" <strong>PGA-cmdr accepts CSV and tabulation-delimited TXT files.</strong>
-              The file must contain at least one <em>population</em> column and one or more
-              <em>genetic marker</em> columns. Additional metadata columns (e.g. latitude,
-              longitude, individual ID) are optional and are simply ignored \u2014 the app only
-              needs Population, optionally Latitude/Longitude, and the loci range.")
-          ),
-          shiny::tags$ul(
-            style = "font-size:14px; line-height:1.9;",
-            shiny::tags$li(shiny::tags$strong("Header row:"), " required (first row = column names)."),
-            shiny::tags$li(shiny::tags$strong("Separator:"), " comma (,), semicolon (;), or tab (\\t) \u2014 pick the one your file uses; the file loads automatically as soon as it is chosen, no extra click needed."),
-            shiny::tags$li(shiny::tags$strong("Population column:"), " any column name; one value per individual."),
-            shiny::tags$li(shiny::tags$strong("Marker columns:"), " single-column (", shiny::tags$code("192/194"), ") or two-column (", shiny::tags$code("192"), " + ", shiny::tags$code("194"), ") encoding \u2014 detected automatically (see below)."),
-            shiny::tags$li(shiny::tags$strong("Missing data:"), " coded as ", shiny::tags$code("0"), " or ", shiny::tags$code("0/0"), " by default \u2014 customisable on import."),
-            shiny::tags$li(shiny::tags$strong("Upload limit:"), " 500 MB.")
-          )
-        ),
-
-        shiny::tags$hr(),
-
-        # Table examples
-        shiny::div(
-          class = "pga-help-section",
-          shiny::tags$h3(shiny::icon("columns"), " Encoding formats"),
-          shiny::fluidRow(
-            shiny::column(6,
-              shiny::div(
-                class = "pga-format-note",
-                shiny::icon("compress-alt"),
-                shiny::HTML(" <strong>Single-column</strong> &mdash; both alleles in one cell, separated by <code>/</code>, <code>-</code> or <code>_</code>. Each locus uses <strong>1</strong> raw column.")
-              ),
-              shiny::div(
-                style = "overflow-x:auto;",
-                shiny::HTML(kableExtra::kable_styling(
-                  knitr::kable(data_one_col, "html", align = "l"),
-                  full_width = FALSE, position = "left",
-                  bootstrap_options = c("striped", "hover", "condensed", "bordered")
-                ))
-              )
-            ),
-            shiny::column(6,
-              shiny::div(
-                class = "pga-format-note",
-                shiny::icon("expand-alt"),
-                shiny::HTML(" <strong>Paired-column</strong> &mdash; each allele in its own column. The first allele column carries the locus name (e.g. <code>B12</code>); the second must be named <code>B12_1</code> (or <code>B12.1</code>) and sit immediately next to it. Each locus uses <strong>2</strong> raw columns.")
-              ),
-              shiny::div(
-                style = "overflow-x:auto;",
-                shiny::HTML(kableExtra::kable_styling(
-                  knitr::kable(data_two_col, "html", align = "l",
-                               col.names = c("Population","B12","B12_1","C07","C07_1")),
-                  full_width = FALSE, position = "left",
-                  bootstrap_options = c("striped", "hover", "condensed", "bordered")
-                ))
-              )
-            )
-          ),  # end fluidRow columns
-
-          shiny::tags$hr(style = "margin: 10px 0;"),
-
-          # --- Column assignment on Import Data
-          shiny::div(
-            class = "pga-format-note",
-            style = "background:#f0f4ff; border-left:4px solid #6B64EF; padding:10px 14px; border-radius:4px; font-size:13px; line-height:1.7;",
-            shiny::tags$p(
-              style = "margin-top:0; font-weight:600;",
-              shiny::icon("magic"), " Setting the loci range on the Import Data page"
-            ),
-            shiny::tags$p(
-              "Once the file is loaded, a numbered ", shiny::tags$strong("Column reference"),
-              " table appears at the bottom of the page, listing every column name next to its position \u2014",
-              " use it to check exactly which number corresponds to which column before filling in the fields above."
-            ),
-            shiny::tags$ol(
-              style = "margin-bottom:0;",
-              shiny::tags$li(shiny::HTML(
-                "<strong>Population / Latitude / Longitude</strong> &mdash; pick the matching column from each dropdown (Latitude/Longitude are optional, needed only for the IBD module's automatic geographic-distance calculation)."
-              )),
-              shiny::tags$li(shiny::HTML(
-                "<strong>Column number of the first locus</strong> &mdash; the column where your markers start (check the Column reference table)."
-              )),
-              shiny::tags$li(shiny::HTML(
-                "<strong>Number of loci</strong> &mdash; the <em>actual number of genetic markers</em> (not raw columns). ",
-                "As soon as the first locus column is set, this field is <strong>auto-suggested</strong> from how many complete loci fit between that column and the end of the file, accounting for single- or paired-column format automatically. Adjust it down if some trailing columns aren't loci."
-              ))
-            ),
-            shiny::tags$p(
-              style = "margin: 8px 0 0;",
-              "The app shows the resulting column range live (e.g. \u201c6 loci \u00d7 2 columns/locus = columns 9 to 20\u201d) so you can verify it against the Column reference table before clicking ",
-              shiny::tags$strong("Apply"), "."
-            )
-          )
-        ),
-
-        shiny::tags$hr(),
-
-        # Tips
-        shiny::div(
-          class = "pga-help-section",
-          shiny::tags$h3(shiny::icon("lightbulb"), " Tips & common pitfalls"),
-          shiny::div(class = "pga-tip", shiny::icon("check-circle"),
-            shiny::HTML(" <strong>Use the default dataset</strong> to familiarise yourself with the expected format before uploading your own data.")),
-          shiny::div(class = "pga-tip", shiny::icon("check-circle"),
-            shiny::HTML(" <strong>Check the Column reference table</strong> on the Import Data page whenever you're unsure which column number corresponds to which field \u2014 it's always visible once a file is loaded.")),
-          shiny::div(class = "pga-tip", shiny::icon("check-circle"),
-            shiny::HTML(" <strong>Null alleles (FreeNA)</strong> use the standard missing-data code you set on import (e.g. <code>0/0</code>); the Null Alleles module handles the EM estimation from there.")),
-          shiny::div(class = "pga-tip", shiny::icon("check-circle"),
-            shiny::HTML(" <strong>Every module downloads one plain .txt file (Allele Freq, Local/Global Panmixia, Subdivision, Diversities, LD) or a zip of several files (General Stats, Null Alleles, IBD, Mantel)</strong> as soon as you click Run \u2014 there is nothing to view or export separately beforehand; the exact output file name(s) are always shown just above the Run button.")),
-          shiny::div(class = "pga-tip", shiny::icon("exclamation-triangle"),
-            shiny::HTML(" <strong>All locus columns must use the same encoding</strong> (single- or paired-column) within a file. Mixed encoding is not supported.")),
-          shiny::div(class = "pga-tip", shiny::icon("exclamation-triangle"),
-            shiny::HTML(" <strong>Population codes must be consistent</strong> across rows &mdash; trailing spaces or capitalisation differences will create duplicate populations.")),
-          shiny::div(class = "pga-tip", shiny::icon("exclamation-triangle"),
-            shiny::HTML(" <strong>Bootstrap over sub-samples (or over individuals for within-population FIS) needs at least 5 units</strong> to be meaningful; below that threshold the app reports <code>NA</code> instead of an unreliable confidence interval, in Null Alleles, Local/Global Panmixia, Subdivision, and Diversities."))
-        ),
-
-        shiny::tags$hr(),
-
-        # Installation & launch
-        shiny::div(
-          class = "pga-help-section",
-          shiny::tags$h3(shiny::icon("download"), " Installation, launch and updates"),
-          shiny::div(
-            class = "pga-format-note",
-            shiny::icon("info-circle"),
-            shiny::HTML(" PGA-cmdr is distributed through
-              <a href='https://kadnaf.r-universe.dev/pgacmdr' target='_blank' style='color:#6B64EF;'>R-universe</a>
-              as ready-to-use binaries for Windows, macOS and Linux &mdash; no compiler,
-              Rtools, gfortran or OpenMP setup is needed.")
-          ),
-          shiny::tags$ol(
-            style = "font-size:14px; line-height:2.0;",
-            shiny::tags$li(shiny::HTML(
-              "<strong>Install</strong> (once, or to update to the latest version):<br>
-               <code>install.packages(\"pgacmdr\", repos = c(\"https://kadnaf.r-universe.dev\", \"https://cloud.r-project.org\"))</code>"
-            )),
-            shiny::tags$li(shiny::HTML(
-              "<strong>Launch</strong> (every time you use the application):<br>
-               <code>pgacmdr::run_app()</code>"
-            ))
-          )
-        ),
-
-        shiny::tags$hr(),
-
-        # Workflow
-        shiny::div(
-          class = "pga-help-section",
-          shiny::tags$h3(shiny::icon("route"), " Recommended workflow"),
-          shiny::tags$ol(
-            style = "font-size:14px; line-height:2.0;",
-            shiny::tags$li(shiny::HTML("<strong>Import Data</strong> &mdash; load the file, assign Population/Latitude/Longitude, set the loci range (auto-suggested), and click Apply.")),
-            shiny::tags$li(shiny::HTML("<strong>Allele Freq</strong> &mdash; check allele frequencies and missing-data rates per locus and population.")),
-            shiny::tags$li(shiny::HTML("<strong>General Stats</strong> &mdash; obtain Ho, Hs, Ht and FIS/FST/FIT (Weir &amp; Cockerham) per locus, plus per-population (Ho and Hs weighted by the number of individuals typed at each locus, as in Genepop) and per-allele detail.")),
-            shiny::tags$li(shiny::HTML("<strong>Null Alleles</strong> &mdash; if a high Ho/Hs ratio is suspected, estimate null allele frequencies and get the ENA-corrected FST.")),
-            shiny::tags$li(shiny::HTML("<strong>Local Panmixia</strong> &mdash; test for HWE (FIS) by locus and by population, with bootstrap over individuals, sub-samples and loci; one file.")),
-            shiny::tags$li(shiny::HTML("<strong>Subdivision</strong> &mdash; estimate FST (bootstrap over individuals and over loci, permutation p-values), pairwise FST between sub-samples (with CI and p-values, no GPS needed) and the G-based test, in one file.")),
-            shiny::tags$li(shiny::HTML("<strong>Diversities</strong> &mdash; obtain HS/HT confidence intervals (bootstrap over individuals, sub-samples and loci) in one file.")),
-            shiny::tags$li(shiny::HTML("<strong>LD</strong> &mdash; test pairwise linkage disequilibrium across loci.")),
-            shiny::tags$li(shiny::HTML("<strong>IBD</strong> &mdash; test isolation by distance: Rousset's (1997) regression and an independent Mantel test (requires GPS data for the automatic geographic distance)."))
-          )
-        ),
-
-        shiny::tags$hr(),
-
-        # Statistical methods & references
-        shiny::div(
-          class = "pga-help-section",
-          shiny::tags$h3(shiny::icon("book-open"), " Statistical methods & key references"),
-          shiny::fluidRow(
-            shiny::column(6,
-              shiny::div(
-                style = "padding:12px 14px; background:#f8f9fc; border-radius:6px; border-left:3px solid #6B64EF; margin-bottom:12px;",
-                shiny::tags$strong("F-statistics (WC84)"),
-                shiny::tags$p(style = "font-size:13px; margin:6px 0 0; line-height:1.7;",
-                  "FIS, FST and FIT are estimated following the unbiased moment estimators of ",
-                  shiny::tags$strong("Weir & Cockerham (1984)"), ". These estimators are robust to unequal sample sizes across populations and loci. Confidence intervals are computed by non-parametric bootstrap over individuals (resampled within each sub-sample; FIS, FIT, FST, HS, HT) and over loci; p-values by permutation. For FST and HT the individual-bootstrap replicates are slightly biased (resampling duplicates genotypes), so the percentile interval is shifted by (observed - bootstrap mean); its width is the bootstrap one. A bootstrap over sub-samples (whole populations resampled) is kept only for HS per locus and FIS per locus: it is biased for FST, FIT and HT because a population drawn twice shrinks the among-population variance of the replicate by (r-1)/r (corrected in Null Alleles by r/(r-1), Davison & Hinkley 1997, section 3.8). Observed values and permutation tests are not affected."),
-                shiny::tags$p(style = "font-size:12px; margin:4px 0 0; color:#777;",
-                  "Weir BS, Cockerham CC. 1984. Estimating F-statistics for the analysis of population structure. Evolution 38:1358-1370.")
-              ),
-              shiny::div(
-                style = "padding:12px 14px; background:#f8f9fc; border-radius:6px; border-left:3px solid #2CBF9F; margin-bottom:12px;",
-                shiny::tags$strong("Gene diversity (Nei & Chesser 1983)"),
-                shiny::tags$p(style = "font-size:13px; margin:6px 0 0; line-height:1.7;",
-                  "HS (within-population gene diversity) and HT (total gene diversity) use the ",
-                  shiny::tags$strong("unbiased small-sample estimator of Nei & Chesser (1983)"),
-                  " (Hs = n/(n\u22121) \u00d7 [1 \u2212 \u03a3p\u00b2 \u2212 Ho/(2n)]), not the simpler biased 1\u2212\u03a3p\u00b2 form. Per-locus and multilocus estimates are reported, with bootstrap CI derived by resampling over individuals, sub-samples, or loci. Resampling individuals lowers HS by about HS/(2n), so those intervals are shifted by (observed HS \u2212 bootstrap mean); HS per population is averaged over loci weighted by the number of individuals typed (as in Genepop)."),
-                shiny::tags$p(style = "font-size:12px; margin:4px 0 0; color:#777;",
-                  "Nei M, Chesser RK. 1983. Estimation of fixation indices and gene diversities. Ann Hum Genet 47:253-259.")
-              ),
-              shiny::div(
-                style = "padding:12px 14px; background:#f8f9fc; border-radius:6px; border-left:3px solid #EBCC2A; margin-bottom:12px;",
-                shiny::tags$strong("Linkage disequilibrium"),
-                shiny::tags$p(style = "font-size:13px; margin:6px 0 0; line-height:1.7;",
-                  "Pairwise LD is tested for every locus pair using a log-likelihood ratio (G) test on the genotypic contingency table within each population; genotypes at one locus are permuted and the observed G-statistic is compared to the permutation distribution, per population and combined (\u201cAll\u201d). Significant LD between physically unlinked loci may reflect selection, admixture, or small sample size."),
-                shiny::tags$p(style = "font-size:12px; margin:4px 0 0; color:#777;",
-                  "Rousset F. 2008. Genepop'007: a complete re-implementation of the Genepop software. Mol Ecol Resour 8:103-106.")
-              )
-            ),
-            shiny::column(6,
-              shiny::div(
-                style = "padding:12px 14px; background:#f8f9fc; border-radius:6px; border-left:3px solid #B40F20; margin-bottom:12px;",
-                shiny::tags$strong("Null alleles (FreeNA / EM algorithm)"),
-                shiny::tags$p(style = "font-size:13px; margin:6px 0 0; line-height:1.7;",
-                  "Null allele frequencies are estimated per locus \u00d7 sub-sample by the Expectation-Maximisation (EM) algorithm implemented in ",
-                  shiny::tags$strong("FreeNA"), " (Chapuis & Estoup 2007). The algorithm iterates between estimating null allele frequency from observed genotype counts and updating expected genotype frequencies until convergence. Null alleles inflate apparent FIS and bias FST downward; the module reports both raw and ENA-corrected FST/DCSE."),
-                shiny::tags$p(style = "font-size:12px; margin:4px 0 0; color:#777;",
-                  "Chapuis MP, Estoup A. 2007. Microsatellite null alleles and estimation of population differentiation. Mol Biol Evol 24:621-631.")
-              ),
-              shiny::div(
-                style = "padding:12px 14px; background:#f8f9fc; border-radius:6px; border-left:3px solid #9986A5; margin-bottom:12px;",
-                shiny::tags$strong("Hardy-Weinberg equilibrium (FIS)"),
-                shiny::tags$p(style = "font-size:13px; margin:6px 0 0; line-height:1.7;",
-                  "HWE departure within populations is quantified via FIS (WC84), by locus or by population. Permutation p-values are obtained by randomising alleles within samples. Significant positive FIS indicates excess homozygosity (inbreeding, null alleles, Wahlund effect); negative FIS indicates heterozygote excess."),
-                shiny::tags$p(style = "font-size:12px; margin:4px 0 0; color:#777;",
-                  "Guo SW, Thompson EA. 1992. Performing the exact test of Hardy-Weinberg proportion for multiple alleles. Biometrics 48:361-372.")
-              ),
-              shiny::div(
-                style = "padding:12px 14px; background:#f8f9fc; border-radius:6px; border-left:3px solid #3B9AB2; margin-bottom:12px;",
-                shiny::tags$strong("Interpretation thresholds"),
-                shiny::tags$p(style = "font-size:13px; margin:6px 0 0; line-height:1.7;",
-                  shiny::tags$strong("FST:"), " <0.05 little differentiation; 0.05-0.15 moderate; 0.15-0.25 great; >0.25 very great (Wright 1978).", shiny::tags$br(),
-                  shiny::tags$strong("FIS:"), " p<0.05 significant HWE departure. Bonferroni correction recommended for multiple loci.", shiny::tags$br(),
-                  shiny::tags$strong("Null alleles:"), " frequency >0.10 at a locus warrants removal or correction before FST estimation.", shiny::tags$br(),
-                  shiny::tags$strong("LD:"), " p-values are not corrected by default; apply FDR or Bonferroni for multiple comparisons.")
-              )
-            )
+        shiny::tags$p(
+          style = "font-size:16px;margin:10px 0;",
+          shiny::tags$a(
+            href = "pga_www/PGA-cmdr_user_guide.pdf",
+            download = "PGA-cmdr_user_guide.pdf", target = "_blank",
+            shiny::icon("download"), " Download the PGA-cmdr user guide (PDF)"
           )
         )
       )

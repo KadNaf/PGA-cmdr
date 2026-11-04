@@ -35,26 +35,18 @@ linkage_desequilibrium_UI <- function(id) {
         uiOutput(ns("ui_ld_out_status")),
         downloadButton(ns("run_LD"), " Run",
                      icon = icon("rocket"),
-                     class = "btn-action-primary btn-block")
+                     class = "btn-action-primary btn-block"),
+            run_folder_warning()
       ),
       
       box(
         width = 8,
         title = div(
           style = "background-color: #FFFFFF; padding: 10px; color: #333a43; font-weight: 600;",
-          icon("chart-line"), "Analysis Summary"
+          icon("chart-line"), "Progress"
         ),
         solidHeader = TRUE,
         status = "primary",
-        
-        fluidRow(
-          column(3, valueBoxOutput(ns("total_pairs_box"), width = NULL)),
-          column(3, valueBoxOutput(ns("significant_pairs_box"), width = NULL)),
-          column(3, valueBoxOutput(ns("mean_pvalue_box"), width = NULL)),
-          column(3, valueBoxOutput(ns("analysis_time_ld_box"), width = NULL))
-        ),
-        
-        br(),
         
         fluidRow(
           column(

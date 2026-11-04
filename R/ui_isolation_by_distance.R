@@ -89,7 +89,17 @@ isolation_by_distance_UI <- function(id) {
             tags$div(style="margin-top:22px;"),
             downloadButton(ns("run_ibd"), " Run",
                          icon = icon("rocket"), class = "btn-action-primary btn-block",
-                         style = "font-weight:bold;")
+                         style = "font-weight:bold;"),
+            run_folder_warning()
+          )
+        ),
+        tags$hr(),
+        fluidRow(
+          column(3,
+            downloadButton(ns("run_mantel"), " Run",
+                         icon = icon("rocket"), class = "btn-action-primary btn-block",
+                         style = "font-weight:bold;"),
+            run_folder_warning()
           )
         )
       )
@@ -187,11 +197,7 @@ isolation_by_distance_UI <- function(id) {
             tags$p(style="color:#777;font-size:11px;",
               "All output files will be saved in a zipped file.")
           ),
-          column(3,
-            downloadButton(ns("run_mantel"), " Run",
-                         icon = icon("rocket"), class = "btn-action-primary btn-block",
-                         style = "font-weight:bold;")
-          )
+          column(3)
         ),
         tags$hr(),
         fluidRow(
@@ -224,6 +230,15 @@ isolation_by_distance_UI <- function(id) {
               uiOutput(ns("mt_col_y_2d_ui")),
               tags$p(style="color:#777;font-size:11px;", icon("lock"), " X is always ln(distance) \u2014 ln(D_geo).")
             )
+          )
+        ),
+        tags$hr(),
+        fluidRow(
+          column(3,
+            downloadButton(ns("run_mantel"), " Run",
+                         icon = icon("rocket"), class = "btn-action-primary btn-block",
+                         style = "font-weight:bold;"),
+            run_folder_warning()
           )
         )
       )

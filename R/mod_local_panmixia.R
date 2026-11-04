@@ -22,17 +22,10 @@ mod_local_panmixia_ui <- function(id) {
             uiOutput(ns("ui_fis_out_status")),
             downloadButton(ns("Run_FIS_Analysis"), " Run",
                          icon = icon("rocket"),
-                         class = "btn-action-primary btn-block", style = "font-weight: bold;")
+                         class = "btn-action-primary btn-block", style = "font-weight: bold;"),
+            run_folder_warning()
           ),
           column(9,
-            h4(icon("chart-line"), "Analysis Summary",
-               style = "font-weight: 600; color: #2c3e50; margin-bottom: 15px;"),
-            fluidRow(
-              column(3, valueBoxOutput(ns("global_fis_box"),        width = NULL)),
-              column(3, valueBoxOutput(ns("global_pvalue_box"),     width = NULL)),
-              column(3, valueBoxOutput(ns("significant_loci_box"),  width = NULL)),
-              column(3, valueBoxOutput(ns("analysis_time_box"),     width = NULL))
-            ),
             fluidRow(
               column(12,
                 h5("Analysis Progress", style = "margin-top: 15px; font-weight: 600;"),

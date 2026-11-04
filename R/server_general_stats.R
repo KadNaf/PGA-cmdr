@@ -904,96 +904,10 @@ server_general_stats <- function(id, rv) {
 
     
     ## FIS value boxes ----
-    ### Global FIS ----
-    output$global_fis_box <- renderValueBox({
-      shiny::req(fis_boot_results())
-      df <- fis_boot_results()$final_table
-      shiny::validate(shiny::need("ID" %in% names(df), "FIS results malformed: missing ID column."))
-      
-      fs <- df %>%
-        dplyr::filter(ID == "Overall") %>%
-        dplyr::pull(Observed_FIS)
-      
-      fs <- fs[1]
-      display <- ifelse(is.na(fs), "NA",
-                        ifelse(abs(fs) < 0.0001, "\u2248 0.0000", format(round(fs, 4), nsmall = 4)))
-      
-      color <- ifelse(is.na(fs), "light-blue",
-                      ifelse(fs > 0.1, "maroon", ifelse(fs > 0.05, "orange", "aqua")))
-      valueBox(
-        value = display,
-        subtitle = HTML("<small>FIS<br>global</small>"),
-        color = color,
-        icon = icon("dna")
-      )
-    })
-    
-    ### Global p-value ----
-    output$global_pvalue_box <- renderValueBox({
-      shiny::req(fis_boot_results())
-      df <- fis_boot_results()$final_table
-      shiny::validate(shiny::need("ID" %in% names(df), "FIS results malformed: missing ID column."))
-      
-      p <- df %>%
-        dplyr::filter(ID == "Overall") %>%
-        dplyr::pull(P_value)
-      
-      p <- p[1]
-      display <- ifelse(is.na(p), "NA",
-                        ifelse(p < 0.0001, "< 0.0001",
-                               ifelse(p < 0.001, "< 0.001", format(round(p, 4), nsmall = 4))))
-      
-      color <- ifelse(is.na(p), "light-blue",
-                      ifelse(p < 0.001, "maroon", ifelse(p < 0.05, "orange", "aqua")))
-      
-      valueBox(
-        value = display,
-        subtitle = HTML("<small>Global <i>p</i>-value<br>Bilateral test</small>"),
-        color = color,
-        icon = icon("balance-scale")
-      )
-    })
     
     
-    ### Significant loci ----
-    output$significant_loci_box <- renderValueBox({
-      shiny::req(fis_boot_results())
-      df <- fis_boot_results()$final_table
-      shiny::validate(shiny::need(all(c("ID", "P_value") %in% names(df)),
-                    "FIS results malformed: missing ID or P_value."))
-      
-      df2 <- df %>% dplyr::filter(ID != "Overall")
-      
-      sig   <- df2 %>% dplyr::filter(!is.na(P_value), P_value < 0.05) %>% nrow()
-      total <- nrow(df2)
-      pct   <- ifelse(total > 0, round(100 * sig / total, 1), 0)
-      
-      color <- ifelse(sig > 0, "yellow", "aqua")
-      
-      valueBox(
-        value = paste0(sig, " / ", total),
-        subtitle = HTML(paste0(
-          "<small>Significant loci<br><small>", pct, "% of total</small></small>"
-        )),
-        color = color,
-        icon = icon("vial")
-      )
-    })
     
-    ### Computation time ----
-    output$analysis_time_box <- renderValueBox({
-      shiny::req(fis_boot_timing())
-      sec <- fis_boot_timing()
-      display <- ifelse(sec < 60, paste0(sec, " s"),
-                        paste0(round(sec / 60, 1), " min"))
-      
-      valueBox(
-        value = display,
-        subtitle = HTML("<small>Computation Time<br>Permutation + Bootstrap</small>"),
-        color = "light-blue",
-        icon = icon("hourglass-half")
-      )
-    })
+    
     
     
     
@@ -1091,9 +1005,7 @@ server_general_stats <- function(id, rv) {
     #    By Population) is written to ONE plain .txt file (no zip, no figure).
     output$ui_fis_out_status <- renderUI({
       tags$p(style = "color:#555;font-size:14px;margin-top:6px;",
-        "The results will be saved in ", tags$code(paste0("local_panmixia_FIS_", Sys.Date(), ".txt")), ".",
-        tags$br(),
-        tags$span(style = "color:#777;font-size:12px;", "If you want to save this file in a new folder, create the folder beforehand: PGA-cmdr cannot create folders."))
+        "The results will be saved in ", tags$code(paste0("local_panmixia_FIS_", Sys.Date(), ".txt")), ".")
     })
 
     output$Run_FIS_Analysis <- downloadHandler(
@@ -1382,106 +1294,7 @@ server_general_stats <- function(id, rv) {
 
     
     ## ===== FIT value boxes =====
-    ### Global FIT =====
-    output$global_fit_box <- renderValueBox({
-      shiny::req(fit_boot_results())
-      
-      ft <- fit_boot_results()$final_table %>%
-        dplyr::filter(ID == "Overall") %>%
-        dplyr::pull(Observed_FIT)
-      
-      display <- ifelse(abs(ft) < 0.0001, "\u2248 0.0000", format(round(ft, 4), nsmall = 4))
-      
-      # Same threshold scheme as FIS (tune if you want FIT-specific cutoffs)
-      color <- ifelse(ft > 0.1, "maroon", ifelse(ft > 0.05, "orange", "aqua"))
-      
-      valueBox(
-        value = display,
-        subtitle = HTML("<small>FIT<br>global</small>"),
-        color = color,
-        icon = icon("dna")
-      )
-    })
     
-    ### Global p-value =====
-    output$global_fit_pvalue_box <- renderValueBox({
-      shiny::req(fit_boot_results())
-
-      df <- fit_boot_results()$final_table
-      p <- df$P_value[df$ID == "Overall"][1]
-
-      display <- if (is.na(p)) {
-        "N/A"
-      } else if (p < 0.0001) {
-        "< 0.0001"
-      } else if (p < 0.001) {
-        "< 0.001"
-      } else {
-        format(round(p, 4), nsmall = 4)
-      }
-
-      color <- if (is.na(p)) {
-        "red"
-      } else if (p < 0.001) {
-        "red"
-      } else if (p < 0.05) {
-        "yellow"
-      } else {
-        "green"
-      }
-
-      valueBox(
-        value = display,
-        subtitle = HTML("<small>Global <i>p</i>-value<br>Two-sided |FIT| permutation</small>"),
-        color = color,
-        icon = icon("balance-scale"),
-        width = NULL
-      )
-    })
-    ### Significant loci =====
-    output$significant_loci_fit_box <- renderValueBox({
-      shiny::req(fit_boot_results())
-      
-      fit_data <- fit_boot_results()$final_table |>
-        dplyr::filter(ID != "Overall")
-      
-      total_loci <- nrow(fit_data)
-      
-      if (total_loci > 0 && "P_value" %in% names(fit_data)) {
-        sig_loci <- sum(fit_data$P_value < 0.05, na.rm = TRUE)
-        pct <- round(100 * sig_loci / total_loci, 1)
-      } else {
-        sig_loci <- 0
-        pct <- 0
-      }
-      
-      color <- if (sig_loci > 0) "yellow" else "aqua"
-      
-      valueBox(
-        value = paste0(sig_loci, " / ", total_loci),
-        subtitle = HTML(paste0("<small>Significant loci (p&lt;0.05)<br>", pct, "% of total</small>")),
-        color = color,
-        icon = icon("vial"),
-        width = NULL
-      )
-    })
-    ### Computation time
-    output$analysis_time_fit_box <- renderValueBox({
-      shiny::req(fit_boot_timing())
-      
-      time_sec <- fit_boot_timing()
-      time_display <- ifelse(time_sec < 60, 
-                             paste0(time_sec, " s"), 
-                             paste0(round(time_sec / 60, 1), " min"))
-      
-      valueBox(
-        value = time_display,
-        subtitle = HTML("<small>Computation Time<br>FIT Analysis</small>"),
-        color = "light-blue",
-        icon = icon("clock"),
-        width = NULL
-      )
-    })
     
     
     
@@ -1509,9 +1322,7 @@ server_general_stats <- function(id, rv) {
     #    to ONE plain .txt file (no zip, no figure).
     output$ui_fit_out_status <- renderUI({
       tags$p(style = "color:#555;font-size:14px;margin-top:6px;",
-        "The results will be saved in ", tags$code(paste0("global_panmixia_FIT_", Sys.Date(), ".txt")), ".",
-        tags$br(),
-        tags$span(style = "color:#777;font-size:12px;", "If you want to save this file in a new folder, create the folder beforehand: PGA-cmdr cannot create folders."))
+        "The results will be saved in ", tags$code(paste0("global_panmixia_FIT_", Sys.Date(), ".txt")), ".")
     })
 
     output$Run_FIT_Analysis <- downloadHandler(
@@ -1708,7 +1519,7 @@ server_general_stats <- function(id, rv) {
       # ---------------------------#
       # 4) Bootstrap (pop blocks) for overall CI (reflected/basic)
       # ---------------------------#
-      .bump_progress(70, sprintf("Bootstrap over subsamples (%s replicates)...",
+      .bump_progress(70, sprintf("Bootstrap over individuals (%s replicates)...",
                                   format(as.integer(n_boot), big.mark = ",")))
       n_subs_avail <- length(unique(mat[, 1]))
       if (n_subs_avail < 5L) {
@@ -2228,7 +2039,7 @@ server_general_stats <- function(id, rv) {
                                          title = "Starting FST analysis...")
 
         results <- run_bootstrap_fst_analysis(
-          n_perm         = input$n_perm_fst_div,
+          n_perm         = 0L,   # no permutation test in Diversities
           n_boot         = input$n_boot_fst_div,
           conf_level     = 0.95,   # fixed: the Diversities module has no confidence-level widget
           missing_code   = 0L,
@@ -2260,59 +2071,7 @@ server_general_stats <- function(id, rv) {
 
     ## ===== FST value boxes =====
     
-    ### Global FST ----
-    output$global_fst_box <- renderValueBox({
-      shiny::req(fst_boot_results())
-      
-      fst <- fst_boot_results()$final_table %>%
-        dplyr::filter(ID == "Overall") %>%
-        dplyr::pull(Observed_FST)
-      
-      display <- ifelse(is.na(fst), "N/A",
-                        ifelse(abs(fst) < 0.0001, "\u2248 0.0000", format(round(fst, 4), nsmall = 4)))
-      
-      # Thresholds are a choice; you can keep yours.
-      color <- if (is.na(fst)) {
-        "red"
-      } else if (fst > 0.25) {
-        "red"
-      } else if (fst > 0.15) {
-        "yellow"
-      } else if (fst > 0.05) {
-        "green"
-      } else {
-        "aqua"
-      }
-      
-      valueBox(
-        value = display,
-        color = color,
-        subtitle = HTML("<small>FST<br>global</small>"),
-        icon = icon("globe-americas"),
-        width = NULL
-      )
-    })
 
-    ### FST \u2014 loci bootstrap (FSTAT/FreeNA-comparable) value box ----
-    output$fst_locus_boot_box <- renderValueBox({
-      shiny::req(fst_boot_results())
-      lb <- fst_boot_results()$locus_boot_table
-      row <- if (is.data.frame(lb)) lb[lb$Statistic == "FST", , drop = FALSE] else NULL
-
-      if (is.null(row) || nrow(row) == 0L || is.na(row$Observed[1])) {
-        valueBox(value = "N/A", color = "red",
-                 subtitle = HTML("<small>FST (loci bootstrap)<br>loci resampled with replacement</small>"),
-                 icon = icon("layer-group"), width = NULL)
-      } else {
-        ci_txt <- sprintf("[%.4f ; %.4f]", row$CI_L[1], row$CI_U[1])
-        valueBox(
-          value    = format(round(row$Observed[1], 4), nsmall = 4),
-          color    = "olive",
-          subtitle = HTML(paste0("<small>FST (loci bootstrap)<br>CI ", ci_txt, "</small>")),
-          icon     = icon("layer-group"), width = NULL
-        )
-      }
-    })
 
 
     # -- Methods block written at the TOP of the single Subdivision output file.
@@ -2360,9 +2119,7 @@ server_general_stats <- function(id, rv) {
     #    div_boot_results()/div_boot_timing().
     output$ui_fst_out_status <- renderUI({
       tags$p(style = "color:#555;font-size:14px;margin-top:6px;",
-        "The results will be saved in ", tags$code(paste0("subdivision_FST_", Sys.Date(), ".txt")), ".",
-        tags$br(),
-        tags$span(style = "color:#777;font-size:12px;", "If you want to save this file in a new folder, create the folder beforehand: PGA-cmdr cannot create folders."))
+        "The results will be saved in ", tags$code(paste0("subdivision_FST_", Sys.Date(), ".txt")), ".")
     })
 
     output$run_FST_Analysis <- downloadHandler(
@@ -2416,219 +2173,18 @@ server_general_stats <- function(id, rv) {
       }
     )
 
-    ### Global p-value ----
-    output$global_fst_pvalue_box <- renderValueBox({
-      shiny::req(fst_boot_results())
-      
-      p <- fst_boot_results()$final_table %>%
-        dplyr::filter(ID == "Overall") %>%
-        dplyr::pull(P_value)
-      
-      p <- p[1]
-      
-      display <- if (is.na(p)) {
-        "N/A"
-      } else if (p < 0.0001) {
-        "< 0.0001"
-      } else if (p < 0.001) {
-        "< 0.001"
-      } else {
-        format(round(p, 4), nsmall = 4)
-      }
-      
-      color <- if (is.na(p)) {
-        "red"
-      } else if (p < 0.001) {
-        "red"
-      } else if (p < 0.05) {
-        "yellow"
-      } else {
-        "green"
-      }
-      
-      valueBox(
-        value = display,
-        subtitle = HTML("<small>Global <i>p</i>-value<br>One-sided (FST \u2265 obs.)</small>"),
-        color = color,
-        icon = icon("balance-scale"),
-        width = NULL
-      )
-    })
 
-    ### CI width (Overall, subsample bootstrap) ----
-    output$fst_ci_width_box <- renderValueBox({
-      shiny::req(fst_boot_results())
-      row <- fst_boot_results()$final_table %>% dplyr::filter(ID == "Overall")
-      width <- if (nrow(row) == 1L) row$CI_U[1] - row$CI_L[1] else NA_real_
-      valueBox(
-        value    = if (is.na(width)) "N/A" else format(round(width, 4), nsmall = 4),
-        subtitle = HTML("<small>CI width (Overall)<br>subsample bootstrap</small>"),
-        color    = if (is.na(width)) "red" else "light-blue",
-        icon     = icon("arrows-left-right"), width = NULL
-      )
-    })
 
-    ### Power proxy (Overall, 1 - p-value) ----
-    output$fst_power_box <- renderValueBox({
-      shiny::req(fst_boot_results())
-      p <- fst_boot_results()$final_table %>%
-        dplyr::filter(ID == "Overall") %>% dplyr::pull(P_value)
-      p <- p[1]
-      power <- if (is.na(p)) NA_real_ else 1 - p
-      valueBox(
-        value    = if (is.na(power)) "N/A" else paste0(round(100 * power, 1), "%"),
-        subtitle = HTML("<small>Power proxy<br>(1 \u2212 p-value)</small>"),
-        color    = "teal", icon = icon("bolt"), width = NULL
-      )
-    })
 
-    ### Bootstrap convergence (fraction of finite Overall bootstrap replicates) ----
-    output$fst_convergence_box <- renderValueBox({
-      shiny::req(fst_boot_results())
-      boot_overall <- fst_boot_results()$bootstrap_results$overall_boot
-      n_req  <- fst_boot_results()$metadata$n_bootstrap %||% length(boot_overall)
-      n_ok   <- if (is.null(boot_overall)) 0L else sum(is.finite(boot_overall))
-      pct    <- if (is.null(boot_overall) || length(boot_overall) == 0L) NA_real_
-                 else round(100 * n_ok / length(boot_overall), 1)
-      color  <- if (is.na(pct)) "red" else if (pct >= 99) "green" else if (pct >= 90) "yellow" else "red"
-      valueBox(
-        value    = if (is.na(pct)) "N/A" else paste0(pct, "%"),
-        subtitle = HTML(paste0("<small>Bootstrap convergence<br>", n_ok, " / ", n_req, " valid replicates</small>")),
-        color    = color, icon = icon("check-circle"), width = NULL
-      )
-    })
 
-    ### Data quality (loci with a defined observed FST) ----
-    output$fst_quality_box <- renderValueBox({
-      shiny::req(fst_boot_results())
-      df <- fst_boot_results()$final_table %>% dplyr::filter(ID != "Overall")
-      total   <- nrow(df)
-      defined <- sum(!is.na(df$Observed_FST))
-      pct     <- if (total > 0) round(100 * defined / total, 1) else NA_real_
-      color   <- if (is.na(pct)) "red" else if (pct == 100) "green" else if (pct >= 80) "yellow" else "red"
-      valueBox(
-        value    = paste0(defined, " / ", total),
-        subtitle = HTML(paste0("<small>Loci with defined FST<br>", ifelse(is.na(pct), "N/A", paste0(pct, "%")), " of total</small>")),
-        color    = color, icon = icon("clipboard-check"), width = NULL
-      )
-    })
 
-    ### Significant loci ----
-    output$significant_loci_fst_box <- renderValueBox({
-      shiny::req(fst_boot_results())
-      
-      fst_data <- fst_boot_results()$final_table %>%
-        dplyr::filter(ID != "Overall")
-      
-      total_loci <- nrow(fst_data)
-      
-      if (total_loci > 0 && "P_value" %in% names(fst_data)) {
-        sig_loci <- sum(!is.na(fst_data$P_value) & fst_data$P_value < 0.05)
-        pct <- round(100 * sig_loci / total_loci, 1)
-      } else {
-        sig_loci <- 0
-        pct <- 0
-      }
-      
-      color <- if (sig_loci > 0) "yellow" else "aqua"
-      
-      valueBox(
-        value = paste0(sig_loci, " / ", total_loci),
-        subtitle = HTML(paste0("<small>Significant loci (p&lt;0.05)<br>", pct, "% of total</small>")),
-        color = color,
-        icon = icon("vial"),
-        width = NULL
-      )
-    })
     
-    ### Computation time ----
-    output$analysis_time_fst_box <- renderValueBox({
-      shiny::req(fst_boot_timing())
-      res <- fst_boot_results()
-      
-      time_sec <- fst_boot_timing()
-      time_display <- ifelse(is.na(time_sec), "N/A",
-                             ifelse(time_sec < 60,
-                                    paste0(time_sec, " s"),
-                                    paste0(round(time_sec / 60, 1), " min")))
-      
-      # Prefer meta returned by wrappers (tells you if parallel was actually used)
-      meta <- NULL
-      if (is.list(res)) {
-        meta <- res$boot_parallel_meta %||% res$perm_parallel_meta %||% (res$metadata$parallel_boot %||% res$metadata$parallel_perm)
-      }
-      thr <- suppressWarnings(as.integer(meta$requested_threads %||% (res$metadata$requested_threads %||% NA_integer_)))
-      if (!is.finite(thr) || length(thr) != 1L || thr < 1L) thr <- NA_integer_
-      
-      used_par <- isTRUE(meta$used_parallel)
-      
-      thr_label <- if (is.na(thr)) {
-        "Threads used: unknown"
-      } else if (isTRUE(used_par)) {
-        paste0("Threads used: ", thr, " (parallel)")
-      } else {
-        paste0("Threads used: ", thr, " (serial)")
-      }
-      
-      valueBox(
-        value = time_display,
-        subtitle = HTML(paste0("<small>Computation Time<br>", thr_label, "</small>")),
-        color = "light-blue",
-        icon = icon("clock"),
-        width = NULL
-      )
-    })
     
     ## ===== Diversities tab value boxes (global_fst, global_hs, global_ht, time) =====
 
-    output$global_fst_div_box <- renderValueBox({
-      res <- div_boot_results()
-      shiny::req(!is.null(res), !is.null(res$final_table))
-      fst <- res$final_table %>%
-        dplyr::filter(ID == "Overall") %>%
-        dplyr::pull(Observed_FST)
-      fst <- if (length(fst) == 0) NA_real_ else fst[[1]]
-      display <- if (is.na(fst)) "N/A" else format(round(fst, 4), nsmall = 4)
-      color <- if (is.na(fst)) "aqua" else if (fst > 0.15) "maroon" else if (fst > 0.05) "orange" else "aqua"
-      valueBox(value = display, subtitle = HTML("<small>Global FST<br>Population subdivision</small>"),
-               color = color, icon = icon("sitemap"), width = NULL)
-    })
 
-    output$global_hs_box <- renderValueBox({
-      res <- div_boot_results()
-      shiny::req(!is.null(res), !is.null(res$hs_table))
-      hs <- res$hs_table %>%
-        dplyr::filter(ID == "Overall") %>%
-        dplyr::pull(Observed_HS)
-      hs <- if (length(hs) == 0) NA_real_ else hs[[1]]
-      display <- if (is.na(hs)) "N/A" else format(round(hs, 4), nsmall = 4)
-      color <- if (is.na(hs)) "aqua" else if (hs > 0.5) "maroon" else if (hs > 0.2) "orange" else "aqua"
-      valueBox(value = display, subtitle = HTML("<small>Global HS<br>Within-pop gene diversity</small>"),
-               color = color, icon = icon("dna"), width = NULL)
-    })
 
-    output$global_ht_box <- renderValueBox({
-      res <- div_boot_results()
-      shiny::req(!is.null(res), !is.null(res$ht_table))
-      ht <- res$ht_table %>%
-        dplyr::filter(ID == "Overall") %>%
-        dplyr::pull(Observed_HT)
-      ht <- if (length(ht) == 0) NA_real_ else ht[[1]]
-      display <- if (is.na(ht)) "N/A" else format(round(ht, 4), nsmall = 4)
-      color <- if (is.na(ht)) "aqua" else if (ht > 0.5) "maroon" else if (ht > 0.2) "orange" else "aqua"
-      valueBox(value = display, subtitle = HTML("<small>Global HT<br>Total gene diversity</small>"),
-               color = color, icon = icon("globe"), width = NULL)
-    })
 
-    output$analysis_time_div_box <- renderValueBox({
-      shiny::req(div_boot_timing())
-      time_sec <- div_boot_timing()
-      time_display <- if (is.na(time_sec)) "N/A" else if (time_sec < 60)
-        paste0(time_sec, " s") else paste0(round(time_sec / 60, 1), " min")
-      valueBox(value = time_display,
-               subtitle = HTML("<small>Computation Time</small>"),
-               color = "light-blue", icon = icon("clock"), width = NULL)
-    })
 
 
     

@@ -131,7 +131,8 @@ null_alleles_UI <- function(id) {
               label = " Run",
               icon = icon("rocket"),
               class = "btn-action-primary btn-block",
-              style = "font-weight: bold;"))
+              style = "font-weight: bold;"),
+            run_folder_warning())
         ),
         br(),
         uiOutput(ns("ui_run_status"))

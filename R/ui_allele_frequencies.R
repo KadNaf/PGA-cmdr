@@ -26,7 +26,8 @@ ui_allele_frequencies <- function(id) {
             downloadButton(ns("update_fstat"),
               label = "Run",
               icon = icon("rocket"),
-              class = "btn-action-primary btn-block", style = "font-weight: bold;")
+              class = "btn-action-primary btn-block", style = "font-weight: bold;"),
+            run_folder_warning()
           )
         )
       )

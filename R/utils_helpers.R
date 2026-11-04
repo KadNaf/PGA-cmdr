@@ -1881,3 +1881,13 @@ summarize_boot_ci <- function(boot_mat,
 
 
 
+
+
+# Warning shown next to every "Run" button (PGA-cmdr cannot create folders).
+run_folder_warning <- function() {
+  shiny::tags$p(
+    style = "color:#8a4b00;background:#fff4e0;border:1px solid #f0c987;border-radius:4px;padding:6px 8px;font-size:12px;margin-top:8px;",
+    shiny::tags$strong("Warning: "),
+    "if you want to save this file in a new folder, please make sure you created this folder before (PGA-cmdr cannot create folders)."
+  )
+}

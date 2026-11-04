@@ -256,64 +256,9 @@ server_LD <- function(id, rv) {
     
     
     # ---- Value boxes ----
-    output$total_pairs_box <- renderValueBox({
-      pv <- ld_results_reactive()
-      total <- if (is.null(pv)) 0 else nrow(pv)
-      
-      valueBox(
-        value = total,
-        subtitle = HTML("<small>Total locus pairs<br>tested for LD</small>"),
-        color = "blue",
-        icon = icon("link")
-      )
-    })
     
-    output$significant_pairs_box <- renderValueBox({
-      pv <- ld_results_reactive()
-      if (is.null(pv) || nrow(pv) == 0) {
-        return(valueBox("0 (0%)", HTML("<small>Significant pairs<br>No data</small>"), color = "green", icon = icon("exclamation-triangle")))
-      }
-      
-      min_pvals <- min_pvals_by_pair(pv)
-      alpha <- 0.05   # significance threshold used for the summary box
-      sig_count <- sum(min_pvals < alpha, na.rm = TRUE)
-      pct <- round(100 * sig_count / length(min_pvals), 1)
-      
-      valueBox(
-        value = paste0(sig_count, " (", pct, "%)"),
-        subtitle = HTML(paste0("<small>Significant pairs<br>p < ", alpha, "</small>")),
-        color = if (sig_count > 0) "yellow" else "green",
-        icon = icon("exclamation-triangle")
-      )
-    })
     
-    output$mean_pvalue_box <- renderValueBox({
-      pv <- ld_results_reactive()
-      if (is.null(pv) || nrow(pv) == 0) {
-        return(valueBox("N/A", HTML("<small>Mean p-value<br>No data</small>"), color = "red", icon = icon("calculator")))
-      }
-      
-      all_pvals <- suppressWarnings(as.numeric(unlist(pv[, -1, drop = FALSE])))
-      all_pvals <- all_pvals[!is.na(all_pvals) & is.finite(all_pvals)]
-      mean_p <- if (length(all_pvals) == 0) NA_real_ else mean(all_pvals)
-      
-      p_display <- ifelse(is.na(mean_p), "N/A",
-                          ifelse(mean_p < 0.001, "< 0.001", format(round(mean_p, 4), nsmall = 4)))
-      
-      valueBox(
-        value = p_display,
-        subtitle = HTML("<small>Mean p-value<br>across all tests</small>"),
-        color = if (is.na(mean_p)) "red" else if (mean_p < 0.05) "red" else "aqua",
-        icon = icon("calculator")
-      )
-    })
     
-    output$analysis_time_ld_box <- renderValueBox({
-      req(ld_timing())
-      time_sec <- ld_timing()
-      time_display <- if (time_sec < 60) paste0(time_sec, " s") else paste0(round(time_sec / 60, 1), " min")
-      valueBox(time_display, HTML("<small>Analysis time<br>LD computation</small>"), color = "aqua", icon = icon("clock"))
-    })
     
     # -----------------------------#
     # helpers (put inside moduleServer)

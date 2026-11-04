@@ -33,7 +33,8 @@ mod_general_stats_ui <- function(id) {
         downloadButton(ns("run_basic_stats"),
                      label = "Run",
                      icon = icon("rocket"),
-                     class = "btn-action-primary btn-block")
+                     class = "btn-action-primary btn-block"),
+            run_folder_warning()
       )
     )
   )

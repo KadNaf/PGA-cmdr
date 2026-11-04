@@ -27,11 +27,13 @@ It covers the full analytical workflow:
 4. Null allele frequency estimation (FreeNA EM algorithm, ENA correction)
 5. Local panmixia -- FIS per locus and/or population (Weir & Cockerham 1984)
 6. Global panmixia -- FIT across all populations
-7. Population subdivision -- FST per locus and globally, plus a G-test
+7. Population subdivision -- FST per locus and globally (bootstrap over individuals and loci), pairwise FST between sub-samples with CI and p-values (no GPS needed), W&C theta permutation test and a G-test
 8. Genetic diversities -- HS, HT (Nei & Chesser 1983), with resampling over
    individuals, sub-samples, or loci
 9. Linkage disequilibrium -- pairwise G-test with permutation p-values
 10. Isolation by distance -- Rousset's (1997) regression and a Mantel test
+
+The random seed used by every bootstrap and permutation is set once, in the Import data tab.
 
 Every module follows the same pattern: set parameters, click **Run**, and a
 single `.txt` (Allele Freq, Local/Global Panmixia, Subdivision, Diversities, LD) or a `.zip` of several files (General Stats, Null Alleles, IBD, Mantel) downloads automatically
