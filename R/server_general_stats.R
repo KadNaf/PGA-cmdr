@@ -924,10 +924,10 @@ server_general_stats <- function(id, rv) {
         "",
         sprintf("Confidence intervals: %s level, percentile bootstrap, %s replicates for each type of bootstrap:", input$conf_level, nb),
         "  _indiv = bootstrap over INDIVIDUALS (individuals resampled within each sub-sample). SE = standard deviation of the bootstrap replicates.",
-        "  _subs  = bootstrap over SUB-SAMPLES (sub-samples resampled as blocks); Table 3 only; NA if fewer than 5 sub-samples.",
-        "  _loci  = bootstrap over LOCI (loci resampled with replacement); Tables 2, 3 and 4.",
+        "  _subs  = bootstrap over SUB-SAMPLES (sub-samples resampled as blocks); Tables 3 and 4; NA if fewer than 5 sub-samples.",
+        "  _loci  = bootstrap over LOCI (loci resampled with replacement); Tables 2 and 4.",
         "  NA rule: a sub-sample with fewer than 5 individuals gets NA for its _indiv interval and SE.",
-        "  Overall rows (Tables 2, 3, 4): multilocus ratio-of-sums FIS over all sub-samples and loci (the same value, CI and p-value in the three tables).",
+        "  Overall rows (Tables 2 and 4): multilocus ratio-of-sums FIS over all sub-samples and loci (the same value, CI and p-value in both tables).",
         ""
       )
       writeLines(hdr, con = con, useBytes = TRUE)
@@ -1035,8 +1035,8 @@ server_general_stats <- function(id, rv) {
         writeLines(sprintf("Table 2: FIS per sub-sample over all loci - CI from %s bootstrap over individuals and over loci; two-sided p-values from %s permutations", nb, npm), con = con)
         wt(.fis_pop_export(res))
         writeLines("", con = con)
-        writeLines(sprintf("Table 3: FIS per locus over all sub-samples - CI from %s bootstrap over individuals, over sub-samples and (Overall row) over loci; two-sided p-values from %s permutations", nb, npm), con = con)
-        wt(lo[-nrow(lo), , drop = FALSE])
+        writeLines(sprintf("Table 3: FIS per locus over all sub-samples - CI from %s bootstrap over individuals and over sub-samples; two-sided p-values from %s permutations", nb, npm), con = con)
+        wt(lo[-nrow(lo), setdiff(names(lo), c("CI_L_loci", "CI_U_loci")), drop = FALSE])
         writeLines("", con = con)
         writeLines(sprintf("Table 4: FIS over all sub-samples and loci - CI from %s bootstrap over individuals, over sub-samples and over loci; two-sided p-value from %s permutations", nb, npm), con = con)
         ov <- lo[nrow(lo), , drop = FALSE]; ov$ID <- "All sub-samples and loci"
@@ -1658,7 +1658,8 @@ server_general_stats <- function(id, rv) {
              overall_ci_lo = cio[["lo"]], overall_ci_hi = cio[["hi"]],
              overall_se = stats::sd(boot_overall, na.rm = TRUE))
       }
-      ht_obs_vec2 <- as.numeric(obs_res$HT)[match(loc, as.character(obs_res$locus_names %||% loc))]
+      ht_obs_vec2 <- as.numeric(obs_res$HT); names(ht_obs_vec2) <- loci_names
+      ht_obs_vec2 <- ht_obs_vec2[loc]
       ht_obs_ov2  <- if (is.finite(ht_obs_overall)) ht_obs_overall else mean(ht_obs_vec2, na.rm = TRUE)
       sum_pop <- .indiv_sum(bi$FST_boot, fst_obs_vec_aligned, fst_obs_overall, bi$FST_overall_boot)
       sum_ht  <- .indiv_sum(bi$HT_boot,  ht_obs_vec2,          ht_obs_ov2,     bi$HT_overall_boot)
@@ -2168,7 +2169,7 @@ server_general_stats <- function(id, rv) {
           writeLines(sprintf("DETAIL: the %s bootstrap replicate values behind the confidence intervals above", nb), con = con)
           writeLines("", con = con)
           pga_write_replicates(con, "Detail A: FST, bootstrap over individuals (raw values before the bias shift; one column per locus, then Overall)", res$boot_detail$fst_subs)
-          pga_write_replicates(con, "Detail B: multilocus FST, FIT, FIS, HS, HT, bootstrap over loci", res$boot_detail$loci)
+          pga_write_replicates(con, "Detail B: multilocus FST, bootstrap over loci", res$boot_detail$loci[, "FST", drop = FALSE])
         }
       }
     )
@@ -2212,7 +2213,7 @@ server_general_stats <- function(id, rv) {
         sprintf("Loci (n = %d): %s", length(loci), paste(loci, collapse = ", ")),
         sprintf("Sub-samples (n = %d): %s", length(pops), paste(pops, collapse = ", ")),
         "",
-        "Estimators: HS = unbiased gene diversity within populations, n/(n-1) * (1 - sum(p^2) - Ho/(2n)) per population and locus, averaged over populations;",
+        "Estimators: HS = unbiased gene diversity within sub-samples, n/(n-1) * (1 - sum(p^2) - Ho/(2n)) per sub-sample and locus, averaged over sub-samples;",
         "            HT = total gene diversity from the mean allele frequencies.",
         "            HS per sub-sample: mean over loci weighted by the number of individuals typed at each locus (as in Genepop).",
         "",
@@ -2277,7 +2278,7 @@ server_general_stats <- function(id, rv) {
           pga_write_replicates(con, "Detail C: HS per sub-sample, bootstrap over individuals (raw values, before the bias shift)", bd$hs_pop_indiv)
           pga_write_replicates(con, "Detail D: HS per sub-sample, bootstrap over loci", bd$hs_pop_loci)
           pga_write_replicates(con, "Detail E: HT per locus, bootstrap over individuals (raw values before the bias shift)", bd$ht_subs)
-          pga_write_replicates(con, "Detail F: multilocus FST, FIT, FIS, HS, HT, bootstrap over loci", bd$loci)
+          pga_write_replicates(con, "Detail F: multilocus HS and HT, bootstrap over loci", bd$loci[, c("HS", "HT"), drop = FALSE])
         }
       }
     )

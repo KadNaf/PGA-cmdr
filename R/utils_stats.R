@@ -495,7 +495,7 @@ pga_pairwise_fst <- function(mat, base = 1000L, n_boot = 1000L, n_perm = 1000L,
 #   INDIVIDUALS (individuals resampled with replacement inside the sub-sample),
 #   two-sided permutation p-value and the two one-sided ones (FSTAT: heterozygote
 #   deficit = permuted FIS >= observed; excess = permuted FIS <= observed).
-# Returns a long data.frame: Locus, Sub_sample, N, FIS, SE, CI_L, CI_U,
+# Returns a long data.frame: Locus, Sub_sample, N_typed (individuals typed at the locus), FIS, SE, CI_L, CI_U,
 #   P_value, P_deficit, P_excess.  CI is NA when the sub-sample has < 5 individuals.
 # ---------------------------------------------------------------------------
 pga_fis_locus_pop <- function(mat, base = 1000L, pop_names = NULL, n_boot = 1000L,
@@ -537,7 +537,9 @@ pga_fis_locus_pop <- function(mat, base = 1000L, pop_names = NULL, n_boot = 1000
         pe[j] <- (pga_n_le(pj, obs[j]) + 1) / (m + 1)
       }
     }
-    out[[k]] <- data.frame(Locus = loc, Sub_sample = pop_names[k], N = n, FIS = obs, SE = se,
+    out[[k]] <- data.frame(Locus = loc, Sub_sample = pop_names[k],
+                           N_typed = as.integer(colSums(sub[, -1L, drop = FALSE] != 0L, na.rm = TRUE)),
+                           FIS = obs, SE = se,
                            CI_L = cl, CI_U = cu, P_value = p2, P_deficit = pd, P_excess = pe,
                            stringsAsFactors = FALSE)
   }

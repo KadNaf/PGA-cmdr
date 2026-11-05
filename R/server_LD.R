@@ -287,13 +287,13 @@ server_LD <- function(id, rv) {
         "Linkage Disequilibrium - genotypic disequilibrium between all pairs of loci",
         sprintf("Dataset: %s", rv$dataset_filename %||% "default_dataset"),
         sprintf("Loci tested (n = %d): %s", length(loci), paste(loci, collapse = ", ")),
-        sprintf("Populations (n = %d): %s", length(pops), paste(pops, collapse = ", ")),
-        "Loci, locus pairs and populations are listed in the order of the data file.",
+        sprintf("Sub-samples (n = %d): %s", length(pops), paste(pops, collapse = ", ")),
+        "Loci, locus pairs and sub-samples are listed in the order of the data file.",
         "",
-        "Test: log-likelihood ratio (G) statistic on the genotype x genotype contingency table of each locus pair, within each population.",
-        sprintf("Permutation test: %d permutations; genotypes at the second locus are permuted among the individuals of each population.", np),
+        "Test: log-likelihood ratio (G) statistic on the genotype x genotype contingency table of each locus pair, within each sub-sample.",
+        sprintf("Permutation test: %d permutations; genotypes at the second locus are permuted among the individuals of each sub-sample.", np),
         "  p-value = (b + 1) / (m + 1), b = number of permuted G >= observed G, m = number of permutations.",
-        "  Column 'All': G statistics summed over all populations, compared with the sum of the permuted G statistics of the same permutation round.",
+        "  Column 'All': G statistics summed over all sub-samples, compared with the sum of the permuted G statistics of the same permutation round.",
         "Missing data: an individual with a missing genotype at either locus of a pair is left out of that pair's table (pairwise deletion).",
         sprintf("Genotype base: %s", base_r())
       )
@@ -326,7 +326,7 @@ server_LD <- function(id, rv) {
         con <- file(file, open = "w", encoding = "UTF-8")
         on.exit(close(con), add = TRUE)
         .write_ld_params(con, pv)
-        writeLines(sprintf("Linkage disequilibrium p-values (all locus pairs), %s permutations; column All = all populations combined", input$n_iterations), con = con)
+        writeLines(sprintf("Linkage disequilibrium p-values (all locus pairs), %s permutations; column All = all sub-samples combined", input$n_iterations), con = con)
         write.table(pv, file = con, sep = "\t", row.names = FALSE, quote = FALSE)
       }
     )

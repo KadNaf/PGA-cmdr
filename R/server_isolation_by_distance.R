@@ -171,10 +171,10 @@ server_isolation_by_distance <- function(id, rv) {
       shiny::req(input$ibd_ext_file)
       ext <- .mt_read_file(input$ibd_ext_file, input$ibd_ext_sep, input$ibd_ext_header)
       nm <- names(ext)
-      pop1_col <- .guess_col(nm, c("^Pop1$", "^Farm1$", "^ID1$"), nm[1])
-      pop2_col <- .guess_col(nm, c("^Pop2$", "^Farm2$", "^ID2$"), nm[2])
+      pop1_col <- .guess_col(nm, c("^Pop1$", "^Sub_sample_1$", "^Farm1$", "^ID1$"), nm[1])
+      pop2_col <- .guess_col(nm, c("^Pop2$", "^Sub_sample_2$", "^Farm2$", "^ID2$"), nm[2])
       shiny::validate(shiny::need(!identical(pop1_col, pop2_col),
-        "Could not identify two distinct Pop1/Pop2 columns in the uploaded file."))
+        "Could not identify two distinct Sub_sample_1/Sub_sample_2 columns in the uploaded file."))
 
       df <- data.frame(Pop1 = trimws(as.character(ext[[pop1_col]])),
                         Pop2 = trimws(as.character(ext[[pop2_col]])),
@@ -577,13 +577,13 @@ server_isolation_by_distance <- function(id, rv) {
 
     output$mt_col_pop1_ui <- renderUI({
       cols <- tryCatch(names(mt_base_df_r()), error = function(e) character(0))
-      selectInput(session$ns("mt_col_pop1"), "Population 1 column:", choices = cols,
-                  selected = .guess_col(cols, c("^Pop1$"), cols[1]))
+      selectInput(session$ns("mt_col_pop1"), "Sub-sample 1 column:", choices = cols,
+                  selected = .guess_col(cols, c("^Pop1$", "^Sub_sample_1$"), cols[1]))
     })
     output$mt_col_pop2_ui <- renderUI({
       cols <- tryCatch(names(mt_base_df_r()), error = function(e) character(0))
-      selectInput(session$ns("mt_col_pop2"), "Population 2 column:", choices = cols,
-                  selected = .guess_col(cols, c("^Pop2$"), cols[min(2L, length(cols))]))
+      selectInput(session$ns("mt_col_pop2"), "Sub-sample 2 column:", choices = cols,
+                  selected = .guess_col(cols, c("^Pop2$", "^Sub_sample_2$"), cols[min(2L, length(cols))]))
     })
 
     output$mt_col_x_ui <- renderUI({

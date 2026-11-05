@@ -1163,6 +1163,8 @@ server_null_alleles <- function(id, rv) {
       con <- file(file, open = "w", encoding = "UTF-8")
       on.exit(close(con))
       writeLines(hdr, con = con, useBytes = TRUE)
+      names(df)[names(df) == "Pop1"] <- "Sub_sample_1"
+      names(df)[names(df) == "Pop2"] <- "Sub_sample_2"
       write.table(df, file = con, sep = sep, row.names = FALSE,
                   quote = FALSE, append = TRUE, col.names = TRUE)
     }

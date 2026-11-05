@@ -92,15 +92,6 @@ isolation_by_distance_UI <- function(id) {
                          style = "font-weight:bold;"),
             run_folder_warning()
           )
-        ),
-        tags$hr(),
-        fluidRow(
-          column(3,
-            downloadButton(ns("run_mantel"), " Run",
-                         icon = icon("rocket"), class = "btn-action-primary btn-block",
-                         style = "font-weight:bold;"),
-            run_folder_warning()
-          )
         )
       )
     ),
