@@ -45,6 +45,28 @@ pga_ci_bias_shift <- function(obs, reps, conf_level = 0.95) {
 }
 
 
+# Re-centre bootstrap replicates on the observed value (bias shift,
+# Efron & Tibshirani 1993): replicate - mean(replicates) + observed. Works on a
+# vector or column-wise on a matrix; non-finite columns/observed are left as is.
+# Used for the bootstrap over sub-samples, whose replicates are displaced
+# (HT, FST and FIT lower, HS unchanged) because a sub-sample drawn twice
+# reduces the among-sub-sample variance.
+pga_recentre <- function(reps, obs) {
+  if (is.matrix(reps)) {
+    obs <- as.numeric(obs)
+    if (length(obs) == 1L) obs <- rep(obs, ncol(reps))
+    for (j in seq_len(ncol(reps))) {
+      m <- mean(reps[, j], na.rm = TRUE)
+      if (is.finite(m) && is.finite(obs[j])) reps[, j] <- reps[, j] - m + obs[j]
+    }
+    reps
+  } else {
+    m <- mean(reps, na.rm = TRUE)
+    if (is.finite(m) && is.finite(obs[1])) reps - m + obs[1] else reps
+  }
+}
+
+
 # Bootstrap over LOCI: loci are resampled with replacement and the multilocus
 # Weir & Cockerham (1984) ratio-of-sums statistics are recomputed.
 #   A, B, C : per-locus WC84 variance components (among populations, among

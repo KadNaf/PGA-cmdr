@@ -313,9 +313,8 @@ server_null_alleles <- function(id, rv) {
     }
 
     # -- Weir & Cockerham (1984) FST components ----------------------------------
-    # boot_subs = TRUE only for the replicates of the bootstrap over sub-samples:
-    # duplicated populations bias the among-population mean square MSP by (r-1)/r,
-    # so it is rescaled by r/(r-1) (Davison & Hinkley 1997, sect. 3.8).
+    # boot_subs is kept for compatibility (no effect): BS/Ss replicates are
+    # re-centred afterwards by the bias shift (observed - mean of replicates).
     weir_components_allele <- function(pop_list, use_corr = FALSE, boot_subs = FALSE) {
       r     <- length(pop_list)
       N_tot <- sum(sapply(pop_list, `[[`, "ni"))
@@ -330,7 +329,6 @@ server_null_alleles <- function(id, rv) {
       MSG  <- (0.5*snA - sAA) / N_tot
       MSI  <- (0.5*snA + sAA - s2A) / (N_tot - r)
       MSP  <- (s2A - 0.5*snA^2/N_tot) / (r - 1)
-      if (isTRUE(boot_subs)) MSP <- MSP * r / (r - 1)
       list(s2P=(MSP-MSI)/(2*nc), s2I=0.5*(MSI-MSG), s2G=MSG)
     }
 
@@ -770,7 +768,7 @@ server_null_alleles <- function(id, rv) {
     #  - unlike bootstrap-over-loci, resampling *populations* for a single
     #  fixed locus is meaningful (that locus's own allele-frequency
     #  variation across populations is what gets resampled).
-    .boot_subsamples_fst_r <- function(em_res, nboot, alpha, progress_cb = NULL) {
+    .boot_subsamples_fst_r <- function(em_res, nboot, alpha, progress_cb = NULL, obs = NULL) {
       markers <- names(em_res)
       pops    <- names(em_res[[markers[1]]])
       n_pop   <- length(pops)
@@ -795,6 +793,13 @@ server_null_alleles <- function(id, rv) {
         boot_ena_loc[b, ] <- fg$per_locus$FST_ENA
         if (!is.null(progress_cb) && (b %% report_every == 0L || b == nboot))
           progress_cb(b / nboot)
+      }
+      # Bias shift (observed - mean of replicates), Efron & Tibshirani 1993
+      if (!is.null(obs)) {
+        boot_raw <- pga_recentre(boot_raw, obs$global_raw)
+        boot_ena <- pga_recentre(boot_ena, obs$global_ena)
+        boot_raw_loc <- pga_recentre(boot_raw_loc, obs$per_locus$FST_raw[match(colnames(boot_raw_loc), obs$per_locus$Locus)])
+        boot_ena_loc <- pga_recentre(boot_ena_loc, obs$per_locus$FST_ENA[match(colnames(boot_ena_loc), obs$per_locus$Locus)])
       }
       per_locus <- data.frame(
         Locus              = markers,
@@ -856,7 +861,7 @@ server_null_alleles <- function(id, rv) {
     # so the call site (results_r()) needed no changes. Runs in batches so
     # the progress bar still updates smoothly; falls back to the pure-R
     # loop automatically if the native call errors for any reason.
-    boot_subsamples_fst <- function(em_res, nboot, alpha, progress_cb = NULL) {
+    boot_subsamples_fst <- function(em_res, nboot, alpha, progress_cb = NULL, obs = NULL) {
       markers <- names(em_res); L <- length(markers)
 
       # Fewer than 5 sub-samples (populations): bootstrap over sub-samples
@@ -909,10 +914,17 @@ server_null_alleles <- function(id, rv) {
 
       if (!cpp_ok) {
         # Defensive fallback: identical statistics, pure-R implementation.
-        return(.boot_subsamples_fst_r(em_res, nboot, alpha, progress_cb))
+        return(.boot_subsamples_fst_r(em_res, nboot, alpha, progress_cb, obs))
       }
 
       colnames(boot_raw_loc) <- markers; colnames(boot_ena_loc) <- markers
+      # Bias shift (observed - mean of replicates), Efron & Tibshirani 1993
+      if (!is.null(obs)) {
+        boot_raw <- pga_recentre(boot_raw, obs$global_raw)
+        boot_ena <- pga_recentre(boot_ena, obs$global_ena)
+        boot_raw_loc <- pga_recentre(boot_raw_loc, obs$per_locus$FST_raw[match(colnames(boot_raw_loc), obs$per_locus$Locus)])
+        boot_ena_loc <- pga_recentre(boot_ena_loc, obs$per_locus$FST_ENA[match(colnames(boot_ena_loc), obs$per_locus$Locus)])
+      }
       per_locus <- data.frame(
         Locus              = markers,
         CI_lo_raw_subs     = round(apply(boot_raw_loc, 2, stats::quantile, probs=alpha/2,   na.rm=TRUE), 6),
@@ -1019,7 +1031,7 @@ server_null_alleles <- function(id, rv) {
         #     as large as the loci bootstrap.
         setProgress(0.78, detail = sprintf("Bootstrap over sub-samples \u2014 global + per-locus FST (%d reps)...", nboot_subs))
         boot_gl_subs <- boot_subsamples_fst(
-          em_res, nboot_subs, alpha,
+          em_res, nboot_subs, alpha, obs = fst_global,
           progress_cb = function(frac) {
             setProgress(0.78 + 0.17 * frac,
               detail = sprintf("Bootstrap over sub-samples \u2014 global + per-locus FST (%d / %d reps)...",

@@ -719,6 +719,9 @@ server_general_stats <- function(id, rv) {
           B       = as.integer(n_boot),
           base    = as.integer(base)
         )
+        # Bias shift of the BS/Ss replicates (observed - mean of replicates)
+        obs_pop_ref <- c(as.numeric(observed_fis), fis_obs_overall)
+        boot_pop_mat <- pga_recentre(boot_pop_mat, obs_pop_ref[seq_len(ncol(boot_pop_mat))])
         summary_pop_list <- summarize_fis_results(
           boot = boot_pop_mat,
           conf = conf_level
@@ -1595,6 +1598,10 @@ server_general_stats <- function(id, rv) {
       names(fst_obs_vec_aligned) <- as.character(obs_res$locus_names %||% loc)
       fst_obs_vec_aligned <- fst_obs_vec_aligned[match(loc, names(fst_obs_vec_aligned))]
       
+      # Bias shift of the BS/Ss replicates (observed - mean of replicates)
+      boot_pop_mat <- pga_recentre(boot_pop_mat, fst_obs_vec_aligned)
+      boot_overall <- pga_recentre(boot_overall, fst_obs_overall)
+
       sum_pop <- .step("summarize_boot_ci(FST)",summarize_boot_ci(
         boot_mat     = boot_pop_mat,
         obs          = fst_obs_vec_aligned,
@@ -1634,6 +1641,12 @@ server_general_stats <- function(id, rv) {
       hs_overall_boot <- boot_pop_res$HS_overall_boot
       ht_overall_boot <- boot_pop_res$HT_overall_boot
       
+      # Bias shift of the BS/Ss replicates (observed - mean of replicates)
+      hs_boot_mat     <- pga_recentre(hs_boot_mat, hs_obs_vec)
+      ht_boot_mat     <- pga_recentre(ht_boot_mat, ht_obs_vec)
+      hs_overall_boot <- pga_recentre(hs_overall_boot, hs_obs_overall)
+      ht_overall_boot <- pga_recentre(ht_overall_boot, ht_obs_overall)
+
       # -- Population-block (subsamples) bootstrap CI --------------------------
       sum_hs <- .step("summarize_boot_ci(HS)", summarize_boot_ci(
         boot_mat     = hs_boot_mat,

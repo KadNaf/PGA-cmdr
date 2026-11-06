@@ -508,11 +508,9 @@ Rcpp::List boot_wc84_fit_popblock_raw_cpp(const Rcpp::IntegerMatrix mat_int,
             const double diff = p_i - p_bar;
             s_num += nd * diff * diff;
           }
-          // Bootstrap over sub-samples: duplicated populations make the replicate's
-          // among-population variance biased by (r-1)/r; rescale by r/(r-1)
-          // (Davison & Hinkley 1997, sect. 3.8). Observed values are NOT rescaled.
-          const double s2_unc = s_num / (n_bar * ((double)r - 1.0));
-          const double s2 = s2_unc * ((double)r / ((double)r - 1.0));
+          // No r/(r-1) rescaling: BS/Ss replicates are re-centred in R by the
+          // bias shift (observed - mean of the replicates).
+          const double s2 = s_num / (n_bar * ((double)r - 1.0));
           
           // hbar_j
           double hbar_num = 0.0;
@@ -529,9 +527,8 @@ Rcpp::List boot_wc84_fit_popblock_raw_cpp(const Rcpp::IntegerMatrix mat_int,
           }
           const double hbar_j = (hbar_den > 0.0) ? (hbar_num / hbar_den) : 0.0;
           
-          // + s2_unc / r : bootstrap-world unbiasing of pbar(1-pbar) (see above)
           const double term_common =
-            (p_bar * (1.0 - p_bar)) + (s2_unc / (double)r) - ((((double)r - 1.0) / (double)r) * s2);
+            (p_bar * (1.0 - p_bar)) - ((((double)r - 1.0) / (double)r) * s2);
           
           const double a_j = (n_bar / n_C) *
             (s2 - ((term_common - (hbar_j / 4.0)) / (n_bar - 1.0)));

@@ -222,14 +222,9 @@ static inline void permute_within_pops_once_rng_buf(
 // ============================================================================
 // Pointer-based WC84 locus stats (a,b,c + Ho/Hs/Ht)
 // ============================================================================
-// boot_pop_corr = true is used ONLY for the replicates of the bootstrap over
-// sub-samples (populations resampled as blocks). Resampling populations with
-// replacement makes duplicated populations count as distinct but identical
-// units, so the among-population variance s2 of a replicate has expectation
-// (r-1)/r * s2_observed (Davison & Hinkley 1997, sect. 3.8). We rescale it by
-// r/(r-1) so that E*[replicate] ~ observed. For HT the same effect inflates
-// sum(pbar^2) by sum(var_a)/r, which is removed. Never used for observed values
-// or permutations.
+// boot_pop_corr is kept for compatibility but is no longer used (always false):
+// the bootstrap over sub-samples is re-centred in R by the bias shift
+// (observed - mean of the replicates), Efron & Tibshirani (1993).
 static inline WC84LocusStats wc84_locus_stats_ptr_ld(
     const int* dat_ptr, int n_used, int ld, int p,
     int locus_col, int pop_col, int missing_code, int base,
@@ -979,10 +974,10 @@ static void boot_popblock_kernel_parallel_rfree(
       mbuf.data(), n_used, ld, p,
       pop_col, missing_code, base,
       fst_tmp.data(), hs_tmp.data(), ht_tmp.data(),
-      /*boot_pop_corr=*/true
+      /*boot_pop_corr=*/false
     );
     
-    const double fst_overall = fst_overall_ratio_of_sums_ptr_ld(mbuf.data(), n_used, ld, p, pop_col, missing_code, base, /*boot_pop_corr=*/true);
+    const double fst_overall = fst_overall_ratio_of_sums_ptr_ld(mbuf.data(), n_used, ld, p, pop_col, missing_code, base, /*boot_pop_corr=*/false);
     const double hs_overall  = mean_across_loci_ptr(hs_tmp.data(), L);
     const double ht_overall  = mean_across_loci_ptr(ht_tmp.data(), L);
     
