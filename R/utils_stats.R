@@ -492,7 +492,8 @@ pga_pairwise_fst <- function(mat, base = 1000L, n_boot = 1000L, n_perm = 1000L,
 # ---------------------------------------------------------------------------
 # FIS (WC84) per locus x sub-sample, with CI and p-values.
 #   For every sub-sample: observed FIS at each locus, CI by bootstrap over
-#   INDIVIDUALS (individuals resampled with replacement inside the sub-sample),
+#   INDIVIDUALS (individuals resampled with replacement inside the sub-sample;
+#   percentile interval shifted by observed - bootstrap mean),
 #   two-sided permutation p-value and the two one-sided ones (FSTAT: heterozygote
 #   deficit = permuted FIS >= observed; excess = permuted FIS <= observed).
 # Returns a long data.frame: Locus, Sub_sample, N_typed (individuals typed at the locus), FIS, SE, CI_L, CI_U,
@@ -517,7 +518,7 @@ pga_fis_locus_pop <- function(mat, base = 1000L, pop_names = NULL, n_boot = 1000
         reps[b, ] <- as.numeric(fis_wc_cpp(sub[sample.int(n, n, replace = TRUE), , drop = FALSE],
                                            base = as.integer(base))$FIS)
       for (j in seq_along(loc)) {
-        ci <- pga_ci(reps[, j], conf_level); cl[j] <- ci[["lo"]]; cu[j] <- ci[["hi"]]
+        ci <- pga_ci_bias_shift(obs[j], reps[, j], conf_level); cl[j] <- ci[["lo"]]; cu[j] <- ci[["hi"]]
         se[j] <- stats::sd(reps[, j], na.rm = TRUE)
       }
     }

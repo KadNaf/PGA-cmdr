@@ -301,6 +301,46 @@ value and `m` is the number of permutations, following:
 Heavy computations (bootstrap, permutation loops) are parallelised with
 OpenMP via C++17 (Rcpp).
 
+## Confidence intervals: the three bootstraps
+
+PGA-cmdr offers three non-parametric bootstraps. They do not measure the same source of variability, so their intervals are not expected to be equal.
+
+**BS/Indiv (bootstrap over individuals).** Individuals are resampled with replacement *within* each sub-sample; the sub-samples and their sizes are kept. This is the default for FIS, FIT, FST and HT (per locus and over all loci, with the multilocus ratio of sums recomputed on each replicate) and for HS. It measures the sampling error due to the individuals actually typed.
+
+**BS/Loci (bootstrap over loci).** Loci are resampled with replacement and the multilocus estimators are recomputed from the per-locus variance components. It measures the variability between loci (used for the multilocus values only).
+
+**BS/Ss (bootstrap over sub-samples).** Whole sub-samples are resampled with replacement. It is kept only for HS per locus, FIS per locus and in Null Alleles (as in FreeNA). It is not used any more for FST, FIT and HT.
+
+### Why BS/Ss was replaced for FST, FIT and HT
+
+When r sub-samples are drawn with replacement among r, some are drawn twice and are treated as two distinct but identical units. If s² is the variance among sub-samples of the allele frequencies (divisor r-1), the average among-sub-sample variance of a replicate is only s²(r-1)/r. FST, FIT and HT are functions of this among-sub-sample variance, so their replicates were centred too low (on a simulated island model with 8 sub-samples of 50 individuals, only about 0.7% of the replicates exceeded the observed FST and the 95% interval excluded the estimate). FIS and HS do not depend on this variance and were not affected.
+
+A correction was implemented for the remaining BS/Ss uses (HS, FIS per locus, Null Alleles): in each replicate the among-sub-sample variance is multiplied by r/(r-1), and s²/r is added to the term p-bar(1-p-bar) of the denominator, because the mean frequency of a replicate is itself variable. Observed values and permutation tests are not modified. The principle (resampling only the top level of a hierarchical sample underestimates the among-unit variance by the factor (r-1)/r) is discussed in Davison & Hinkley (1997, *Bootstrap Methods and their Application*, section on hierarchical data) and Field & Welsh (2007, *J. R. Stat. Soc. B* 69:369-390). The application to the Weir & Cockerham estimator, with the additional s²/r term, is an adaptation made for PGA-cmdr and has not been published; the exact references should be checked before citation.
+
+Even after this correction, BS/Ss intervals for FST remain wider than the sampling variability when the number of sub-samples is small. In a simulation of an island model (FST about 0.012, 10 loci, 50 individuals per sub-sample, 40 simulated metapopulations per case, 300 bootstrap replicates), the mean bootstrap standard error of the overall FST was:
+
+| Number of sub-samples | True SD of FST (new sample of sub-samples) | BS/Ss | BS/Indiv | BS/Loci |
+|---|---|---|---|---|
+| 5 | 0.0013 | 0.0037 | 0.0016 | 0.0012 |
+| 10 | 0.0009 | 0.0013 | 0.0011 | 0.0009 |
+| 20 | 0.0007 | 0.0007 | 0.0008 | 0.0006 |
+| 40 | 0.0004 | 0.0005 | 0.0006 | 0.0004 |
+
+BS/Ss is therefore unreliable for FST with few sub-samples (about three times too large with 5), which is why it is no longer used for FST, FIT and HT.
+
+### Bias shift of the BS/Indiv intervals
+
+Resampling individuals duplicates genotypes, so the replicates are slightly biased. In the simulations (island model, 8 sub-samples of 50 individuals, 10 loci, 40 simulated data sets) the mean of the bootstrap replicates minus the observed value was:
+
+| Statistic | HS | FST | FIS | FIT | HT |
+|---|---|---|---|---|---|
+| Bootstrap bias (BS/Indiv) | -0.0092 | +0.0099 | -0.0101 | 0.0000 | -0.0011 |
+| SD of the estimator | 0.0024 | 0.0009 | 0.0046 | 0.0046 | 0.0023 |
+
+Duplicated genotypes lower the within-sub-sample diversity (HS) and, mechanically, raise FST; FIS is lowered by about 1/(2n) for a sub-sample of n individuals; the two effects cancel in FIT = 1 - (1 - FIS)(1 - FST), which is unbiased; HT is almost unaffected. Each replicate R is therefore corrected by the estimated bias, R(corrected) = R + (observed - mean of the replicates), which amounts to shifting the percentile interval by (observed - bootstrap mean) (bias correction of the bootstrap, Efron & Tibshirani 1993, *An Introduction to the Bootstrap*, chapter 10). The correction is applied to every statistic and every level (per locus, per sub-sample, overall); the width of the interval and the standard error (SE, the standard deviation of the replicates) are not modified; the permutation p-values are not affected. For FIT the correction is negligible.
+
+For the bootstrap over sub-samples the replicates of HT are lowered (a sub-sample drawn twice reduces the among-sub-sample variance), and so are those of FST and FIT, whereas HS is not affected (simulation, 8 sub-samples: HT -0.0023, FST -0.0027, FIT -0.0027, HS 0.0000). The same type of correction by (observed - mean of the replicates) is possible; PGA-cmdr currently uses the r/(r-1) rescaling described above for the remaining BS/Ss intervals (Null Alleles), which gives replicates centred on the observed values.
+
 ## A note on cross-module dependencies
 
 Most modules are fully self-contained: they read the imported dataset and

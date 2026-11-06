@@ -537,6 +537,11 @@ server_general_stats <- function(id, rv) {
       names(pop_sizes) <- unname(pop_lookup[names(pop_sizes)])
       small_pops <- names(pop_sizes)[pop_sizes < 5L]
       small_pops <- intersect(small_pops, names(boot_mean))
+      # Bias shift (observed - bootstrap mean), see run_fis_by_locus().
+      .sh <- as.numeric(obs_pop[names(boot_mean)]) - as.numeric(boot_mean)
+      .sh[!is.finite(.sh)] <- 0
+      ci_l <- ci_l + .sh
+      ci_u <- ci_u + .sh
       if (length(small_pops)) {
         boot_mean[small_pops] <- NA_real_
         ci_l[small_pops] <- NA_real_
@@ -755,6 +760,17 @@ server_general_stats <- function(id, rv) {
         final_df$CI_U[overall_row_idx]         <- summary_list$overall_ci_upper
         final_df$Boot_Mean[overall_row_idx]    <- summary_list$overall_mean
       }
+      # Bias shift (observed - bootstrap mean): resampling individuals duplicates
+      # genotypes and lowers the replicates of FIS by about 1/(2n); the percentile
+      # interval is shifted by the estimated bias (Efron & Tibshirani 1993, ch. 10).
+      .shift <- final_df$Observed_FIS - final_df$Boot_Mean
+      .shift[!is.finite(.shift)] <- 0
+      final_df$CI_L <- final_df$CI_L + .shift
+      final_df$CI_U <- final_df$CI_U + .shift
+      summary_list$ci_lower <- summary_list$ci_lower + .shift[seq_along(summary_list$ci_lower)]
+      summary_list$ci_upper <- summary_list$ci_upper + .shift[seq_along(summary_list$ci_upper)]
+      summary_list$overall_ci_lower <- summary_list$overall_ci_lower + .shift[length(.shift)]
+      summary_list$overall_ci_upper <- summary_list$overall_ci_upper + .shift[length(.shift)]
       # 6) Permutation test p-values (two-sided abs)
       perm_res <- NULL
       
@@ -923,7 +939,7 @@ server_general_stats <- function(id, rv) {
         "  Table 1 also gives the two one-sided p-values of FSTAT: P_deficit (heterozygote deficit, permuted FIS >= observed) and P_excess (heterozygote excess, permuted FIS <= observed).",
         "",
         sprintf("Confidence intervals: %s level, percentile bootstrap, %s replicates for each type of bootstrap:", input$conf_level, nb),
-        "  _indiv = bootstrap over INDIVIDUALS (individuals resampled within each sub-sample). SE = standard deviation of the bootstrap replicates.",
+        "  _indiv = bootstrap over INDIVIDUALS (individuals resampled within each sub-sample). Resampling duplicates genotypes and lowers FIS by about 1/(2n), so the percentile interval is shifted by (observed - bootstrap mean). SE = standard deviation of the bootstrap replicates.",
         "  _subs  = bootstrap over SUB-SAMPLES (sub-samples resampled as blocks); Tables 3 and 4; NA if fewer than 5 sub-samples.",
         "  _loci  = bootstrap over LOCI (loci resampled with replacement); Tables 2 and 4.",
         "  NA rule: a sub-sample with fewer than 5 individuals gets NA for its _indiv interval and SE.",
