@@ -841,9 +841,11 @@ server_isolation_by_distance <- function(id, rv) {
           X         = s$x_label,
           Y         = s$y_label,
           Observed  = .fmt_stat(s$stat_obs),
-          Slope     = .fmt_stat(s$slope),
-          Intercept = .fmt_stat(s$intercept),
-          R2        = sprintf("%.4f", s$r2),
+          # slope, intercept and R2 belong to the linear regression: they are not
+          # defined for the rank-based Spearman statistic
+          Slope     = if (identical(k, "spearman")) "NA" else .fmt_stat(s$slope),
+          Intercept = if (identical(k, "spearman")) "NA" else .fmt_stat(s$intercept),
+          R2        = if (identical(k, "spearman")) "NA" else sprintf("%.4f", s$r2),
           p_pos_col = if (is.na(p_pos)) "NA" else sprintf("%.4f", p_pos),
           p_neg_col = if (is.na(p_neg)) "NA" else sprintf("%.4f", p_neg),
           p_2sided  = if (is.na(p_2sided)) "NA" else sprintf("%.4f", p_2sided),
@@ -874,7 +876,7 @@ server_isolation_by_distance <- function(id, rv) {
 
         p1 <- file.path(tmpdir, paste0(mt_out_root_r(), "-Mantel-Res.txt"))
         con <- file(p1, open = "w", encoding = "UTF-8")
-        writeLines("Mantel test results", con = con, useBytes = TRUE)
+        writeLines(c("Mantel test results", sprintf("Permutations: %s", format(r$n_perm))), con = con, useBytes = TRUE)
         write.table(d, file = con, sep = "\t", row.names = FALSE, quote = FALSE, append = TRUE)
         close(con)
 

@@ -284,27 +284,13 @@ server_LD <- function(id, rv) {
       loci <- tryCatch(loci_names(), error = function(e) character(0))
       pops <- setdiff(names(pv), c("Pair", "All"))
       hdr <- c(
-        "Linkage Disequilibrium - genotypic disequilibrium between all pairs of loci",
+        "Linkage Disequilibrium - genotypic disequilibrium between all pairs of loci (G test)",
         sprintf("Dataset: %s", rv$dataset_filename %||% "default_dataset"),
         sprintf("Loci tested (n = %d): %s", length(loci), paste(loci, collapse = ", ")),
         sprintf("Sub-samples (n = %d): %s", length(pops), paste(pops, collapse = ", ")),
-        "Loci, locus pairs and sub-samples are listed in the order of the data file.",
-        "",
-        "Test: log-likelihood ratio (G) statistic on the genotype x genotype contingency table of each locus pair, within each sub-sample.",
-        sprintf("Permutation test: %d permutations; genotypes at the second locus are permuted among the individuals of each sub-sample.", np),
-        "  p-value = (b + 1) / (m + 1), b = number of permuted G >= observed G, m = number of permutations.",
-        "  Column 'All': G statistics summed over all sub-samples, compared with the sum of the permuted G statistics of the same permutation round.",
-        "Missing data: an individual with a missing genotype at either locus of a pair is left out of that pair's table (pairwise deletion).",
-        sprintf("Genotype base: %s", base_r())
+        sprintf("Permutations: %d", np),
+        sprintf("Seed: %s", rv$seed %||% 1L)
       )
-      if (!is.na(np) && np < 1000L) {
-        hdr <- c(hdr, "",
-          "WARNING: fewer than 1000 permutations were requested. The Monte Carlo",
-          "p-value formula p = (b + 1) / (m + 1) gives a slight overestimation when m",
-          "is small, which may produce unreliable significance calls. A minimum of",
-          "1000 permutations is recommended; 10 000 or more for publication-quality",
-          "results.")
-      }
       writeLines(c(hdr, ""), con = con, useBytes = TRUE)
     }
 

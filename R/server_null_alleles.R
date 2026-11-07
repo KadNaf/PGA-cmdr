@@ -1094,8 +1094,8 @@ server_null_alleles <- function(id, rv) {
             N_tot          = n_tot,
             N_blanks       = n_blanks,
             f_expBlanks    = round(f_exp, 6),
-            p_value        = pval,
             p_nulls        = round(av_p, 6),
+            p_value        = pval,
             stringsAsFactors=FALSE)
         })
         t2 <- do.call(rbind, t2_rows)
@@ -1595,9 +1595,6 @@ server_null_alleles <- function(id, rv) {
       p6 <- file.path(tmpdir, out_filename("-run_parameters"))
       con6 <- file(p6, open = "w", encoding = "UTF-8")
       writeLines(d6$header, con = con6, useBytes = TRUE)
-      writeLines("Methods:", con = con6)
-      writeLines(d6$methods, con = con6, useBytes = TRUE)
-      writeLines("", con = con6)
       writeLines("General parameters:", con = con6)
       # No "Parameter / Value" header line: the two columns are self-explanatory.
       write.table(d6$params, file = con6, sep = "\t", row.names = FALSE, col.names = FALSE, quote = FALSE)
