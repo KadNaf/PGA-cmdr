@@ -81,7 +81,7 @@ null_alleles_UI <- function(id) {
         tags$hr(),
 
         h4(icon("dice"), "Bootstrap parameters"),
-        p("Bootstrap over subsamples (for 5 subsamples at least) and over loci (for 5 loci at least)"),
+        p("Bootstrap over subsamples (for 5 subsamples at least), over loci (for 5 loci at least) and over individuals"),
         tags$div(style = "display:flex; align-items:flex-start; gap:0; flex-wrap:wrap;",
           tags$div(style = "flex:1; min-width:190px; padding-right:16px;",
             numericInput(ns("nboot"),
@@ -91,6 +91,12 @@ null_alleles_UI <- function(id) {
             numericInput(ns("nboot_subs"),
               label = "Bootstraps over subsamples (at least 100):",
               value = 5000, min = 100, max = 99999, step = 1000, width = "100%"))
+        ),
+        tags$div(style = "display:flex; align-items:flex-start; gap:0; flex-wrap:wrap; margin-top:8px;",
+          tags$div(style = "flex:1; min-width:190px; padding-right:16px;",
+            numericInput(ns("nboot_indiv"),
+              label = "Bootstraps over individuals (at least 100; slowest step):",
+              value = 1000, min = 100, max = 20000, step = 100, width = "100%"))
         ),
         tags$div(style = "display:flex; align-items:flex-start; gap:0; flex-wrap:wrap; margin-top:8px;",
           tags$div(style = "flex:1; min-width:190px; padding-right:16px;",

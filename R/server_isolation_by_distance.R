@@ -312,6 +312,45 @@ server_isolation_by_distance <- function(id, rv) {
                   selected = .guess_col(cols, c("^FR_hi$", "^FR_raw_hi$"), if (length(cols)) cols[1] else NULL))
     })
 
+    # Bootstrap over INDIVIDUALS (BS/Indiv) for the slope b, Nb = 1/b and Nem = Nb/(2*pi).
+    # Uses the replicates of pairwise FST(-ENA) that the Null Alleles module computed by
+    # resampling individuals within sub-samples (EM re-run on every replicate): each
+    # replicate is linearised (FST/(1-FST)) and regressed on the geographic distance
+    # selected here. CI = percentile CI shifted by (observed - mean of replicates).
+    # Not available when the pairwise table comes from an uploaded file.
+    .ibd_boot_indiv <- function(df, x, col_avg, b_obs) {
+      na <- tryCatch(na_results_r(), error = function(e) NULL)
+      if (isTRUE(identical(input$ibd_source, "external")) || is.null(na) ||
+          is.null(na$boot_indiv$reps)) return(NULL)
+      kind <- if (grepl("raw", col_avg, ignore.case = TRUE)) "raw"
+              else if (grepl("ENA", col_avg) || identical(col_avg, "FR")) "ena" else return(NULL)
+      lg   <- na$fst_pair$long
+      reps <- if (kind == "raw") na$boot_indiv$reps$pair_raw else na$boot_indiv$reps$pair_ena
+      k    <- match(paste(df$Pop1, df$Pop2), paste(lg$Pop1, lg$Pop2))
+      if (is.null(reps) || anyNA(k) || !is.finite(b_obs)) return(NULL)
+      reps <- reps[, k, drop = FALSE]
+      slope <- apply(reps, 1, function(f) {
+        y <- .linearise(f); ok <- is.finite(y) & is.finite(x)
+        if (sum(ok) < 3L || stats::var(x[ok]) == 0) return(NA_real_)
+        stats::cov(x[ok], y[ok]) / stats::var(x[ok])
+      })
+      slope <- slope[is.finite(slope)]
+      if (length(slope) < 10L) return(NULL)
+      ci <- pga_ci_bias_shift(b_obs, slope, 1 - (na$alpha %||% 0.05))
+      nb_ci <- if (ci[["lo"]] > 0 || ci[["hi"]] < 0) sort(1 / c(ci[["lo"]], ci[["hi"]])) else c(NA_real_, NA_real_)
+      out <- data.frame(
+        Statistic  = c("b", "Nb", "Nem"),
+        Estimate   = c(b_obs, 1 / b_obs, 1 / b_obs / (2 * pi)),
+        CI_L_indiv = c(ci[["lo"]], nb_ci[1], nb_ci[1] / (2 * pi)),
+        CI_U_indiv = c(ci[["hi"]], nb_ci[2], nb_ci[2] / (2 * pi)),
+        SE_indiv   = c(stats::sd(slope), NA_real_, NA_real_),
+        stringsAsFactors = FALSE)
+      out[, c("Estimate", "CI_L_indiv", "CI_U_indiv", "SE_indiv")] <-
+        lapply(out[, c("Estimate", "CI_L_indiv", "CI_U_indiv", "SE_indiv")], function(v) signif(v, 6))
+      attr(out, "n_boot") <- length(slope)
+      out
+    }
+
     .run_ibd_computation <- function() {
       df <- full_pair_table_r()
       shiny::req(input$ibd_col_geo, input$ibd_col_avg, input$ibd_col_lo, input$ibd_col_hi)
@@ -345,7 +384,9 @@ server_isolation_by_distance <- function(id, rv) {
         c(Line = "95%CI-s",  nbnem(reg_hi))
       )
 
-      list(df = df, x = x, y_avg = y_avg, y_lo = y_lo, y_hi = y_hi,
+      boot_indiv <- .ibd_boot_indiv(df, x, input$ibd_col_avg, reg_avg$slope)
+
+      list(df = df, x = x, y_avg = y_avg, y_lo = y_lo, y_hi = y_hi, boot_indiv = boot_indiv,
            x_label = x_label, y_label = y_label,
            col_geo = input$ibd_col_geo, col_avg = input$ibd_col_avg,
            col_lo = input$ibd_col_lo, col_hi = input$ibd_col_hi,
@@ -361,8 +402,18 @@ server_isolation_by_distance <- function(id, rv) {
       r <- ibd_results_r()
       s <- as.data.frame(r$summary, stringsAsFactors = FALSE)
       writeLines(c("Isolation by Distance - Regression results", ""), con = con, useBytes = TRUE)
-      writeLines("Regression summary (slope / b / Nb / Nem for average and CI bounds):", con = con)
+      writeLines("Table 1: regression of genetic distance (FST/(1-FST)) on geographic distance. Line = Average (observed pairwise values) and 95%CI-i / 95%CI-s (lines through the lower / upper limits of the pairwise intervals obtained by bootstrap over loci, BS/Loci). b = slope, Nb = 1/b (neighbourhood size), Nem = Nb/(2*pi)", con = con)
       write.table(s, file = con, sep = "\t", row.names = FALSE, quote = FALSE, append = TRUE)
+      bi <- r$boot_indiv
+      writeLines("", con = con)
+      if (!is.null(bi)) {
+        writeLines(sprintf("Table 2: slope b, Nb and Nem with confidence intervals (CI_L_indiv and CI_U_indiv) and standard error (SE_indiv) by bootstrap over individuals (BS/Indiv: individuals resampled within sub-samples, %d replicates)", attr(bi, "n_boot")), con = con)
+        write.table(bi, file = con, sep = "\t", row.names = FALSE, quote = FALSE, append = TRUE)
+      } else {
+        writeLines("Table 2: bootstrap over individuals (BS/Indiv) not available (pairwise table uploaded from a file, or genetic distance column other than FR / FR_raw)", con = con)
+      }
+      writeLines("", con = con)
+      writeLines(pga_legend("ibd"), con = con)
     }
 
     # -- Parameters file: everything about how this run was configured ------
@@ -385,6 +436,7 @@ server_isolation_by_distance <- function(id, rv) {
         hdr <- c(hdr,
           sprintf("Missing data code per locus: %s", loci_line),
           sprintf("Bootstrap replicates (over loci): %s", na$nboot),
+          sprintf("Bootstrap replicates (over individuals): %s", na$nboot_indiv %||% "n/a"),
           sprintf("Critical level (alpha): %s", na$alpha)
         )
       }

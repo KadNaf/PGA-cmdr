@@ -943,12 +943,123 @@ server_null_alleles <- function(id, rv) {
     }
 
     # ??????????????????????????????????????????????????????????????????????????
+    #  BOOTSTRAP OVER INDIVIDUALS (BS/Indiv): individuals are resampled with
+    #  replacement WITHIN each sub-sample (the same individuals at every locus,
+    #  so the multilocus genotypes stay intact). For every replicate the whole
+    #  null-allele pipeline is re-run: EM (null allele frequencies), global and
+    #  per-locus FST / FST-ENA, and pairwise FST / FST-ENA. The percentile CI
+    #  is shifted by (observed - mean of replicates), as for the other
+    #  bootstraps over individuals (pga_ci_bias_shift).
+    #  Replicates are independent: indices are drawn first (reproducible
+    #  whatever the number of cores), then replicates run in parallel on
+    #  platforms that support forking.
+    # ??????????????????????????????????????????????????????????????????????????
+    boot_indiv_na <- function(raw_df, markers, pops, treats, base, nboot, seed,
+                              progress_cb = NULL, n_cores = NULL) {
+      G <- lapply(pops, function(p) {
+        d   <- raw_df[raw_df$Population == p, , drop = FALSE]
+        ids <- unique(d$Individual)
+        m   <- matrix(0L, length(ids), length(markers), dimnames = list(NULL, markers))
+        g   <- as.integer(ifelse(is.na(d$gt), 0L, d$gt))
+        ok  <- d$Marker %in% markers
+        m[cbind(match(d$Individual[ok], ids), match(d$Marker[ok], markers))] <- g[ok]
+        m
+      })
+      names(G) <- pops
+      set.seed(as.integer((seed + 7919L) %% .Machine$integer.max))
+      idx <- lapply(seq_len(nboot), function(b)
+        lapply(G, function(m) sample.int(nrow(m), nrow(m), replace = TRUE)))
+      empty <- list(rd=0.0, pfreq=numeric(0), genefreq_obs=numeric(0), H_ii=numeric(0),
+                    H_iX=numeric(0), N=0L, efpop=0L, n_absent=0L, n_null_homo=0L,
+                    alleles=integer(0), n_valid_geno=0L, treat="absent")
+      one <- function(ix) {
+        em_b <- list()
+        for (loc in markers) {
+          em_b[[loc]] <- list()
+          treat <- as.character(treats[loc] %||% "absent")
+          for (pop in pops) {
+            gts <- G[[pop]][ix[[pop]], loc]
+            em_b[[loc]][[pop]] <- if (length(gts) == 0L) empty else em_freena(gts, base, treat)
+          }
+        }
+        g  <- compute_fst_global_full(em_b)
+        pw <- compute_fst_pairwise(em_b)
+        list(go = c(g$global_raw, g$global_ena),
+             gl = cbind(g$per_locus$FST_raw, g$per_locus$FST_ENA),
+             pr = pw$long$FST_raw, pe = pw$long$FST_ENA)
+      }
+      if (is.null(n_cores)) {
+        n_cores <- if (.Platform$OS.type == "windows") 1L else
+          max(1L, min(8L, (parallel::detectCores(logical = FALSE) %||% 2L) - 1L))
+      }
+      out <- vector("list", nboot)
+      batch <- max(1L, n_cores * 5L)
+      done <- 0L
+      while (done < nboot) {
+        ii <- seq.int(done + 1L, min(nboot, done + batch))
+        res <- if (n_cores > 1L) parallel::mclapply(idx[ii], one, mc.cores = n_cores, mc.set.seed = FALSE)
+               else lapply(idx[ii], one)
+        bad <- vapply(res, function(x) inherits(x, "try-error") || is.null(x), logical(1))
+        if (any(bad)) res[bad] <- lapply(idx[ii][bad], one)   # a failed fork is redone serially
+        out[ii] <- res
+        done <- max(ii)
+        if (!is.null(progress_cb)) progress_cb(done / nboot)
+      }
+      list(
+        glob_raw = vapply(out, function(x) x$go[1], numeric(1)),
+        glob_ena = vapply(out, function(x) x$go[2], numeric(1)),
+        loc_raw  = do.call(rbind, lapply(out, function(x) x$gl[, 1])),
+        loc_ena  = do.call(rbind, lapply(out, function(x) x$gl[, 2])),
+        pair_raw = do.call(rbind, lapply(out, function(x) x$pr)),
+        pair_ena = do.call(rbind, lapply(out, function(x) x$pe)),
+        nboot = nboot, n_cores = n_cores)
+    }
+
+    # Summaries of boot_indiv_na(): bias-shifted CI (observed - mean of replicates)
+    # and standard error, for the global/per-locus FST and for each pair.
+    summarise_boot_indiv <- function(bi, fst_global, fst_pair, alpha) {
+      cl <- 1 - alpha
+      one <- function(obs, reps) {
+        r <- reps[is.finite(reps)]
+        if (!is.finite(obs) || length(r) < 10L) return(c(lo = NA_real_, hi = NA_real_, se = NA_real_))
+        ci <- pga_ci_bias_shift(obs, r, cl)
+        c(lo = ci[["lo"]], hi = ci[["hi"]], se = stats::sd(r))
+      }
+      pl <- fst_global$per_locus
+      loc <- data.frame(Locus = pl$Locus, stringsAsFactors = FALSE)
+      for (k in seq_len(nrow(pl))) {
+        a <- one(pl$FST_raw[k], bi$loc_raw[, k]); b <- one(pl$FST_ENA[k], bi$loc_ena[, k])
+        loc$CI_lo_raw_indiv[k] <- a[["lo"]]; loc$CI_hi_raw_indiv[k] <- a[["hi"]]
+        loc$CI_lo_ENA_indiv[k] <- b[["lo"]]; loc$CI_hi_ENA_indiv[k] <- b[["hi"]]
+        loc$SE_raw_indiv[k] <- a[["se"]]; loc$SE_ENA_indiv[k] <- b[["se"]]
+      }
+      a <- one(fst_global$global_raw, bi$glob_raw); b <- one(fst_global$global_ena, bi$glob_ena)
+      glob <- data.frame(Locus = "GLOBAL_MULTILOCUS",
+                         CI_lo_raw_indiv = a[["lo"]], CI_hi_raw_indiv = a[["hi"]],
+                         CI_lo_ENA_indiv = b[["lo"]], CI_hi_ENA_indiv = b[["hi"]],
+                         SE_raw_indiv = a[["se"]], SE_ENA_indiv = b[["se"]],
+                         stringsAsFactors = FALSE)
+      lg <- fst_pair$long
+      pair <- data.frame(Pop1 = lg$Pop1, Pop2 = lg$Pop2, stringsAsFactors = FALSE)
+      if (!is.null(bi$pair_raw) && ncol(bi$pair_raw) == nrow(lg)) {
+        for (k in seq_len(nrow(lg))) {
+          a <- one(lg$FST_raw[k], bi$pair_raw[, k]); b <- one(lg$FST_ENA[k], bi$pair_ena[, k])
+          pair$FST_raw_CI_lo_indiv[k] <- a[["lo"]]; pair$FST_raw_CI_hi_indiv[k] <- a[["hi"]]
+          pair$FST_ENA_CI_lo_indiv[k] <- b[["lo"]]; pair$FST_ENA_CI_hi_indiv[k] <- b[["hi"]]
+          pair$SE_FST_raw_indiv[k] <- a[["se"]]; pair$SE_FST_ENA_indiv[k] <- b[["se"]]
+        }
+      }
+      list(global = rbind(glob, loc), pair = pair)
+    }
+
+    # ??????????????????????????????????????????????????????????????????????????
     #  MAIN REACTIVE - single "run_all" button
     # ??????????????????????????????????????????????????????????????????????????
     .run_computation <- function() {
       req(db_ready())
       nboot      <- max(100L, min(99999L, as.integer(input$nboot %||% 5000L)))
       nboot_subs <- max(50L,  min(20000L, as.integer(input$nboot_subs %||% 500L)))
+      nboot_indiv <- max(100L, min(20000L, as.integer(input$nboot_indiv %||% 1000L)))
       alpha   <- as.numeric(input$alpha %||% 0.05)
       if (!is.finite(alpha) || alpha <= 0 || alpha >= 1) alpha <- 0.05
       ci      <- ci_bounds(alpha)
@@ -1029,14 +1140,28 @@ server_null_alleles <- function(id, rv) {
         #     global FST. No EM re-run needed (population membership is what's
         #     resampled, not genotypes), so this is fast even at nboot_subs
         #     as large as the loci bootstrap.
-        setProgress(0.78, detail = sprintf("Bootstrap over sub-samples \u2014 global + per-locus FST (%d reps)...", nboot_subs))
+        setProgress(0.72, detail = sprintf("Bootstrap over sub-samples \u2014 global + per-locus FST (%d reps)...", nboot_subs))
         boot_gl_subs <- boot_subsamples_fst(
           em_res, nboot_subs, alpha, obs = fst_global,
           progress_cb = function(frac) {
-            setProgress(0.78 + 0.17 * frac,
+            setProgress(0.72 + 0.03 * frac,
               detail = sprintf("Bootstrap over sub-samples \u2014 global + per-locus FST (%d / %d reps)...",
                                 round(frac * nboot_subs), nboot_subs))
           })
+
+        # 11. Bootstrap over individuals (individuals resampled within sub-samples;
+        #     EM and FST re-run on every replicate: this is the slowest step).
+        setProgress(0.75, detail = sprintf("Bootstrap over individuals (%d reps)...", nboot_indiv))
+        bi_raw <- boot_indiv_na(raw_df, markers, pops, treats, base, nboot_indiv, seed,
+          progress_cb = function(frac) {
+            setProgress(0.75 + 0.20 * frac,
+              detail = sprintf("Bootstrap over individuals (%d / %d reps)...",
+                               round(frac * nboot_indiv), nboot_indiv))
+          })
+        boot_indiv <- summarise_boot_indiv(bi_raw, fst_global, fst_pair, alpha)
+        boot_indiv$reps_pair_raw <- bi_raw$pair_raw
+        boot_indiv$reps_pair_ena <- bi_raw$pair_ena
+        boot_indiv$reps <- bi_raw
 
         setProgress(0.95, detail = "Assembling results...")
 
@@ -1110,9 +1235,10 @@ server_null_alleles <- function(id, rv) {
           per_locus_pair = per_locus_pair,
           boot_gl_loci      = boot_gl_loci,
           boot_gl_subs      = boot_gl_subs,
+          boot_indiv        = boot_indiv,
           boot_pair_fst     = boot_pair_fst_loci,
           boot_pair_dc      = boot_pair_dc_loci,
-          nboot = nboot, nboot_subs = nboot_subs, alpha = alpha, ci = ci,
+          nboot = nboot, nboot_subs = nboot_subs, nboot_indiv = nboot_indiv, alpha = alpha, ci = ci,
           seed = seed,
           treats = treats, markers = markers, pops = pops,
           em_res = em_res
@@ -1239,9 +1365,31 @@ server_null_alleles <- function(id, rv) {
         pl$CI_lo_ENA_subs <- NA_real_; pl$CI_hi_ENA_subs <- NA_real_
       }
 
+      # Bootstrap over individuals (BS/Indiv): global row and one row per locus.
+      bin <- r$boot_indiv$global
+      indiv_cols <- c("CI_lo_raw_indiv", "CI_hi_raw_indiv", "CI_lo_ENA_indiv", "CI_hi_ENA_indiv",
+                      "SE_raw_indiv", "SE_ENA_indiv")
+      for (nm in indiv_cols) {
+        glob[[nm]] <- if (!is.null(bin)) bin[[nm]][match("GLOBAL_MULTILOCUS", bin$Locus)] else NA_real_
+        pl[[nm]]   <- if (!is.null(bin)) bin[[nm]][match(pl$Locus, bin$Locus)] else NA_real_
+      }
+      for (nm in indiv_cols[1:4]) {
+        glob[[nm]] <- round(glob[[nm]], 6); pl[[nm]] <- round(pl[[nm]], 6)
+      }
+      # Standard errors of the three bootstraps (SE columns come last).
+      glob$SE_raw_subs <- stats::sd(r$boot_gl_subs$boot_raw_vec, na.rm = TRUE)
+      glob$SE_ENA_subs <- stats::sd(r$boot_gl_subs$boot_ena_vec, na.rm = TRUE)
+      pl$SE_raw_subs <- NA_real_; pl$SE_ENA_subs <- NA_real_
+      glob$SE_raw_loci <- stats::sd(r$boot_gl_loci$boot_raw_vec, na.rm = TRUE)
+      glob$SE_ENA_loci <- stats::sd(r$boot_gl_loci$boot_ena_vec, na.rm = TRUE)
+      pl$SE_raw_loci <- NA_real_; pl$SE_ENA_loci <- NA_real_
+
       col_order <- c("Locus", "FST_raw", "FST_ENA",
+                     "CI_lo_raw_indiv", "CI_hi_raw_indiv", "CI_lo_ENA_indiv", "CI_hi_ENA_indiv",
                      "CI_lo_raw_subs", "CI_hi_raw_subs", "CI_lo_ENA_subs", "CI_hi_ENA_subs",
-                     "CI_lo_raw_loci", "CI_hi_raw_loci", "CI_lo_ENA_loci", "CI_hi_ENA_loci")
+                     "CI_lo_raw_loci", "CI_hi_raw_loci", "CI_lo_ENA_loci", "CI_hi_ENA_loci",
+                     "SE_raw_indiv", "SE_ENA_indiv", "SE_raw_subs", "SE_ENA_subs",
+                     "SE_raw_loci", "SE_ENA_loci")
       out <- rbind(glob[, col_order], pl[, col_order])
       list(header = meta_header(r, "Global FST and FST-ENA with bootstrap CIs"),
            data   = out)
@@ -1292,14 +1440,17 @@ server_null_alleles <- function(id, rv) {
     file5_data <- reactive({
       r <- results_r()
       n <- max(length(r$boot_gl_loci$boot_raw_vec %||% numeric(0)),
-               length(r$boot_gl_subs$boot_raw_vec %||% numeric(0)))
+               length(r$boot_gl_subs$boot_raw_vec %||% numeric(0)),
+               length(r$boot_indiv$reps$glob_raw %||% numeric(0)))
       pad <- function(v) { v <- v %||% numeric(0); length(v) <- n; v }
       data <- data.frame(
         Replicate                 = seq_len(n),
         FST_raw_boot_over_loci    = pad(r$boot_gl_loci$boot_raw_vec),
         FST_ENA_boot_over_loci    = pad(r$boot_gl_loci$boot_ena_vec),
         FST_raw_boot_over_subs    = pad(r$boot_gl_subs$boot_raw_vec),
-        FST_ENA_boot_over_subs    = pad(r$boot_gl_subs$boot_ena_vec)
+        FST_ENA_boot_over_subs    = pad(r$boot_gl_subs$boot_ena_vec),
+        FST_raw_boot_over_indiv   = pad(r$boot_indiv$reps$glob_raw),
+        FST_ENA_boot_over_indiv   = pad(r$boot_indiv$reps$glob_ena)
       )
       list(header = meta_header(r, "Bootstrap distributions (global FST, all replicates)"),
            data   = data)
@@ -1510,10 +1661,11 @@ server_null_alleles <- function(id, rv) {
       params_df <- data.frame(
         Parameter = c("Dataset", "Sub-samples column",
                       "Bootstrap replicates (over loci)", "Bootstrap replicates (over sub-samples)",
+                      "Bootstrap replicates (over individuals)",
                       "Bootstrap random seed (set.seed)",
                       "Confidence interval", "Critical level (alpha)"),
         Value = c(rv$dataset_filename %||% "default_dataset", subsample_col,
-                  r$nboot, r$nboot_subs %||% r$nboot,
+                  r$nboot, r$nboot_subs %||% r$nboot, r$nboot_indiv %||% NA,
                   paste0(r$seed %||% "n/a", " - rerun with the same seed and nboot to reproduce these CI exactly"),
                   ci_pct, r$alpha),
         stringsAsFactors = FALSE
@@ -1525,10 +1677,30 @@ server_null_alleles <- function(id, rv) {
     # ??????????????????????????????????????????????????????????????????????????
     #  FILE 7 - Full pairwise table (only when included)
     # ??????????????????????????????????????????????????????????????????????????
+    # Every interval of the file is labelled by its bootstrap: _loci (over loci, already
+    # present), _indiv (over individuals, added here). Standard errors come last.
+    .label_pairwise_cols <- function(df, pair_indiv) {
+      nm <- names(df)
+      nm <- sub("^(FST_(raw|ENA))_lo$", "\\1_CI_lo_loci", nm)
+      nm <- sub("^(FST_(raw|ENA))_hi$", "\\1_CI_hi_loci", nm)
+      nm <- sub("^(DCSE_(raw|INA))_lo$", "\\1_CI_lo_loci", nm)
+      nm <- sub("^(DCSE_(raw|INA))_hi$", "\\1_CI_hi_loci", nm)
+      nm <- sub("^(FR(_ENA|_raw)?)_lo$", "\\1_lo_loci", nm)
+      nm <- sub("^(FR(_ENA|_raw)?)_hi$", "\\1_hi_loci", nm)
+      names(df) <- nm
+      if (!is.null(pair_indiv) && nrow(pair_indiv) > 0L && ncol(pair_indiv) > 2L) {
+        k <- match(paste(df$Pop1, df$Pop2), paste(pair_indiv$Pop1, pair_indiv$Pop2))
+        for (cn in setdiff(names(pair_indiv), c("Pop1", "Pop2"))) df[[cn]] <- pair_indiv[[cn]][k]
+        se <- grep("^SE_", names(df), value = TRUE)
+        df <- df[, c(setdiff(names(df), se), se), drop = FALSE]
+      }
+      df
+    }
+
     file7_data <- reactive({
       shiny::req(include_pairwise_r())
       list(header = meta_header(results_r(), if (isTRUE(gps_available_r())) "Full pairwise table (FST, FST-ENA, DCSE, DCSE-INA, FR, D_geo, ln(D_geo))" else "Full pairwise table (FST, FST-ENA, DCSE, DCSE-INA, FR; no GPS coordinates, so no D_geo)"),
-           data   = full_pairwise_r())
+           data   = .label_pairwise_cols(full_pairwise_r(), results_r()$boot_indiv$pair))
     })
 
     output$dl_file7_txt <- downloadHandler(

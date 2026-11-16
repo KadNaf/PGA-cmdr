@@ -935,7 +935,7 @@ server_general_stats <- function(id, rv) {
         sprintf("Dataset: %s", rv$dataset_filename %||% "default_dataset"),
         sprintf("Permutations: %s", input$n_perm),
         sprintf("Bootstrap replicates: %s", nb),
-        sprintf("Confidence level: %s", input$conf_level),
+        sprintf("Confidence level of bootstraps: %s", input$conf_level),
         sprintf("Seed: %s", .seed()),
         ""
       )
@@ -1038,18 +1038,20 @@ server_general_stats <- function(id, rv) {
         .write_fis_params(con, res)
         lo <- .fis_locus_export(res)
         wt <- function(x) pga_write_table(x, file = con)
-        writeLines("Table 1: FIS per locus and sub-sample", con = con)
+        writeLines("Table 1: FIS per locus and sub-sample, confidence intervals (BS over individuals) (CI_L and CI_U), Standard error of FIS (SE) and p-values for panmixia.", con = con)
         wt(lp)
         writeLines("", con = con)
-        writeLines("Table 2: FIS per sub-sample over all loci", con = con)
+        writeLines("Table 2: FIS per sub-sample over all loci, confidence intervals by bootstrap over individuals (BS/Indiv) and over loci (BS/Loci), standard errors (SE) and p-values (P_value)", con = con)
         wt(.fis_pop_export(res))
         writeLines("", con = con)
-        writeLines("Table 3: FIS per locus over all sub-samples", con = con)
+        writeLines("Table 3: FIS per locus over all sub-samples, confidence intervals by bootstrap over individuals (BS/Indiv) and over sub-samples (BS/Subs), standard errors (SE) and p-values (P_value)", con = con)
         wt(lo[-nrow(lo), setdiff(names(lo), c("CI_L_loci", "CI_U_loci")), drop = FALSE])
         writeLines("", con = con)
-        writeLines("Table 4: FIS over all sub-samples and loci", con = con)
+        writeLines("Table 4: FIS over all sub-samples and loci, confidence intervals by BS/Indiv, BS/Subs and BS/Loci, standard errors (SE) and p-value (P_value)", con = con)
         ov <- lo[nrow(lo), , drop = FALSE]; ov$ID <- "All sub-samples and loci"
         wt(ov)
+        writeLines("", con = con)
+        writeLines(pga_legend("fis"), con = con)
       }
     )
 
@@ -1157,6 +1159,20 @@ server_general_stats <- function(id, rv) {
       CI_FIT <- rbind(lo = ci_lower, hi = ci_upper)
       boot_mean <- as.numeric(colMeans(fit_boot_mat, na.rm = TRUE))
       boot_se   <- apply(fit_boot_mat, 2, stats::sd, na.rm = TRUE)
+      # BS/Subs: whole sub-samples resampled with replacement (blocks of individuals).
+      subs_res <- boot_subs_wc84_cpp(
+        dat            = mat,
+        pop_col_1based = 1L,
+        missing_code   = as.integer(missing_code),
+        base           = as.integer(base),
+        B              = as.integer(n_boot),
+        seed           = as.numeric(.seed()),
+        n_threads      = 0L
+      )
+      fit_subs_mat <- subs_res$FIT_boot
+      ci_subs <- vapply(seq_along(locus_names), function(j)
+        pga_ci_bias_shift(observed_fit[j], fit_subs_mat[, j], conf_level), numeric(2))
+      se_subs <- apply(fit_subs_mat, 2, stats::sd, na.rm = TRUE)
       perm_res <- NULL
       perm_fit_mat <- NULL
       
@@ -1188,6 +1204,9 @@ server_general_stats <- function(id, rv) {
         SE           = as.numeric(boot_se),
         CI_L         = ci_lower,
         CI_U         = ci_upper,
+        SE_subs      = as.numeric(se_subs),
+        CI_L_subs    = as.numeric(ci_subs[1, ]),
+        CI_U_subs    = as.numeric(ci_subs[2, ]),
         P_value      = as.numeric(pvals_fit),
         stringsAsFactors = FALSE
       )
@@ -1217,6 +1236,8 @@ server_general_stats <- function(id, rv) {
         overall_p <- as.numeric(perm_res$p_FIT_overall)
       }
       
+      bs_ov <- subs_res$FIT_overall_boot; bs_ov <- bs_ov[is.finite(bs_ov)]
+      ci_so <- if (length(bs_ov) >= 10) pga_ci_bias_shift(overall_obs, bs_ov, conf_level) else c(lo = NA_real_, hi = NA_real_)
       overall_row <- data.frame(
         ID          = "Overall",
         Observed_FIT = overall_obs,
@@ -1224,6 +1245,9 @@ server_general_stats <- function(id, rv) {
         SE           = overall_se,
         CI_L         = overall_ci_l,
         CI_U         = overall_ci_u,
+        SE_subs      = stats::sd(bs_ov),
+        CI_L_subs    = ci_so[["lo"]],
+        CI_U_subs    = ci_so[["hi"]],
         P_value      = overall_p,
         stringsAsFactors = FALSE
       )
@@ -1315,7 +1339,7 @@ server_general_stats <- function(id, rv) {
         sprintf("Dataset: %s", rv$dataset_filename %||% "default_dataset"),
         sprintf("Permutations: %s", input$n_perm_fit),
         sprintf("Bootstrap replicates: %s", input$n_boot_fit),
-        sprintf("Confidence level: %s", input$conf_level_fit),
+        sprintf("Confidence level of bootstraps: %s", input$conf_level_fit),
         sprintf("Seed: %s", .seed()),
         ""
       )
@@ -1348,26 +1372,36 @@ server_general_stats <- function(id, rv) {
                                  seed = .seed())$table
         bl <- bl[bl$Statistic == "FIT", , drop = FALSE]
 
+        # One row per locus, then ONE "Overall" row carrying the three bootstraps:
+        # BS/Indiv (individuals within sub-samples), BS/Subs (sub-samples) and
+        # BS/Loci (loci). Per-locus rows have no BS/Loci interval (not defined).
+        nl <- rep(NA_real_, n)
         out <- data.frame(
           ID           = ft$ID,
           Observed_FIT = ft$Observed_FIT,
-          SE           = ft$SE,
+          CI_L_indiv   = ft$CI_L,
+          CI_U_indiv   = ft$CI_U,
+          CI_L_subs    = ft$CI_L_subs,
+          CI_U_subs    = ft$CI_U_subs,
+          CI_L_loci    = nl,
+          CI_U_loci    = nl,
+          SE_indiv     = ft$SE,
+          SE_subs      = ft$SE_subs,
+          SE_loci      = nl,
           P_value      = ft$P_value,
-          CI_L         = ft$CI_L,
-          CI_U         = ft$CI_U,
           stringsAsFactors = FALSE
         )
-        out$ID[n] <- "Overall (BS/Indiv)"
-        out <- rbind(out, data.frame(ID = "Overall (BS/Loci)", Observed_FIT = ft$Observed_FIT[n],
-                                     SE = if ("SE" %in% names(bl)) bl$SE else NA_real_,
-                                     P_value = ft$P_value[n], CI_L = bl$CI_L, CI_U = bl$CI_U,
-                                     stringsAsFactors = FALSE))
+        out$ID[n] <- "Overall"
+        out$CI_L_loci[n] <- bl$CI_L; out$CI_U_loci[n] <- bl$CI_U
+        out$SE_loci[n]   <- if ("SE" %in% names(bl)) bl$SE else NA_real_
 
         con <- file(file, open = "w", encoding = "UTF-8")
         on.exit(close(con), add = TRUE)
         .write_fit_params(con, res)
-        writeLines("FIT per locus and overall", con = con)
+        writeLines("FIT per locus and overall, confidence intervals (CI_L and CI_U) by bootstrap over individuals (BS/Indiv), over sub-samples (BS/Subs) and over loci (BS/Loci), standard errors (SE) of the bootstraps and p-value (P_value) of the test of global panmixia", con = con)
         pga_write_table(out, file = con)
+        writeLines("", con = con)
+        writeLines(pga_legend("fit"), con = con)
       }
     )
 
@@ -1690,6 +1724,21 @@ server_general_stats <- function(id, rv) {
       subs_fitfis <- list(FIT = ci_fit_ov, FIS = ci_fis_ov,
                           reps = cbind(FIT = bi$FIT_overall_boot, FIS = bi$FIS_overall_boot))
 
+      # -- Bootstrap over SUB-SAMPLES (BS/Subs), bias-shifted -------------------
+      # Whole sub-samples are resampled with replacement. Reported next to BS/Indiv
+      # so that every interval of the output files is labelled by what was resampled.
+      .bump_progress(80, sprintf("Bootstrap over sub-samples (%s replicates)...",
+                                  format(as.integer(n_boot), big.mark = ",")))
+      bsub <- .step("boot_subs_wc84_cpp()", boot_subs_wc84_cpp(
+        dat = mat, pop_col_1based = 1L, missing_code = as.integer(missing_code),
+        base = as.integer(base), B = as.integer(n_boot), seed = as.numeric(.seed()),
+        n_threads = .n_threads()))
+      sum_pop_s <- .indiv_sum(bsub$FST_boot, fst_obs_vec_aligned, fst_obs_overall, bsub$FST_overall_boot)
+      sum_ht_s  <- .indiv_sum(bsub$HT_boot,  ht_obs_vec2,          ht_obs_ov2,     bsub$HT_overall_boot)
+      ci_fit_ov_s <- pga_ci_bias_shift(fit_obs_ov, bsub$FIT_overall_boot, conf_level)
+      ci_fis_ov_s <- pga_ci_bias_shift(fis_obs_ov, bsub$FIS_overall_boot, conf_level)
+      ci_hs_ov_s  <- pga_ci_bias_shift(hs_obs_overall, bsub$HS_overall_boot, conf_level)
+
       # -- Individual bootstrap CI for HS (resample individuals within pops) --
       # Genetic Diversities only (skipped for Subdivision, see diversity_extras).
       if (isTRUE(diversity_extras)) {
@@ -1807,6 +1856,9 @@ server_general_stats <- function(id, rv) {
         Boot_SE     = as.numeric(ht_pop_se_loci),
         CI_L        = as.numeric(sum_ht$ci_lo),
         CI_U        = as.numeric(sum_ht$ci_hi),
+        SE_subs     = as.numeric(sum_ht_s$se),
+        CI_L_subs   = as.numeric(sum_ht_s$ci_lo),
+        CI_U_subs   = as.numeric(sum_ht_s$ci_hi),
         stringsAsFactors = FALSE
       )
       ht_overall_row <- data.frame(
@@ -1816,6 +1868,9 @@ server_general_stats <- function(id, rv) {
         Boot_SE     = as.numeric(ht_pop_se_overall),
         CI_L        = as.numeric(sum_ht$overall_ci_lo),
         CI_U        = as.numeric(sum_ht$overall_ci_hi),
+        SE_subs     = sum_ht_s$overall_se,
+        CI_L_subs   = sum_ht_s$overall_ci_lo,
+        CI_U_subs   = sum_ht_s$overall_ci_hi,
         stringsAsFactors = FALSE
       )
       ht_final <- rbind(ht_tbl, ht_overall_row)
@@ -1874,6 +1929,9 @@ server_general_stats <- function(id, rv) {
         P_value      = as.numeric(p_vec),
         CI_L         = as.numeric(ci_lower[loc]),
         CI_U         = as.numeric(ci_upper[loc]),
+        SE_subs      = as.numeric(sum_pop_s$se[loc]),
+        CI_L_subs    = as.numeric(sum_pop_s$ci_lo[loc]),
+        CI_U_subs    = as.numeric(sum_pop_s$ci_hi[loc]),
         stringsAsFactors = FALSE
       )
       
@@ -1895,6 +1953,9 @@ server_general_stats <- function(id, rv) {
         P_value      = pval_overall,
         CI_L         = overall_ci_l,
         CI_U         = overall_ci_u,
+        SE_subs      = sum_pop_s$overall_se,
+        CI_L_subs    = sum_pop_s$overall_ci_lo,
+        CI_U_subs    = sum_pop_s$overall_ci_hi,
         stringsAsFactors = FALSE
       )
       
@@ -1929,18 +1990,24 @@ server_general_stats <- function(id, rv) {
       list(
         final_table      = final_results,
         locus_boot_table = locus_boot_tbl,
-        # Overall (multilocus) CI by bootstrap over sub-samples, to sit next to the
-        # bootstrap-over-loci CI in the multilocus table.
+        # Overall (multilocus) values by bootstrap over individuals and over sub-samples,
+        # to sit next to the bootstrap-over-loci CI in the multilocus table.
         subs_overall = {
           hs_ci <- pga_ci_bias_shift(hs_obs_overall, bi$HS_overall_boot, conf_level)
           data.frame(
-            Statistic = c("FIS", "FST", "FIT", "HS", "HT"),
-            SE_indiv  = c(stats::sd(bi$FIS_overall_boot), sum_pop$overall_se, stats::sd(bi$FIT_overall_boot),
-                          stats::sd(bi$HS_overall_boot), sum_ht$overall_se),
-            CI_L_subs = c(subs_fitfis$FIS[["lo"]], sum_pop$overall_ci_lo, subs_fitfis$FIT[["lo"]],
-                          hs_ci[["lo"]], sum_ht$overall_ci_lo),
-            CI_U_subs = c(subs_fitfis$FIS[["hi"]], sum_pop$overall_ci_hi, subs_fitfis$FIT[["hi"]],
-                          hs_ci[["hi"]], sum_ht$overall_ci_hi),
+            Statistic  = c("FIS", "FST", "FIT", "HS", "HT"),
+            SE_indiv   = c(stats::sd(bi$FIS_overall_boot), sum_pop$overall_se, stats::sd(bi$FIT_overall_boot),
+                           stats::sd(bi$HS_overall_boot), sum_ht$overall_se),
+            CI_L_indiv = c(subs_fitfis$FIS[["lo"]], sum_pop$overall_ci_lo, subs_fitfis$FIT[["lo"]],
+                           hs_ci[["lo"]], sum_ht$overall_ci_lo),
+            CI_U_indiv = c(subs_fitfis$FIS[["hi"]], sum_pop$overall_ci_hi, subs_fitfis$FIT[["hi"]],
+                           hs_ci[["hi"]], sum_ht$overall_ci_hi),
+            SE_subs    = c(stats::sd(bsub$FIS_overall_boot), sum_pop_s$overall_se, stats::sd(bsub$FIT_overall_boot),
+                           stats::sd(bsub$HS_overall_boot), sum_ht_s$overall_se),
+            CI_L_subs  = c(ci_fis_ov_s[["lo"]], sum_pop_s$overall_ci_lo, ci_fit_ov_s[["lo"]],
+                           ci_hs_ov_s[["lo"]], sum_ht_s$overall_ci_lo),
+            CI_U_subs  = c(ci_fis_ov_s[["hi"]], sum_pop_s$overall_ci_hi, ci_fit_ov_s[["hi"]],
+                           ci_hs_ov_s[["hi"]], sum_ht_s$overall_ci_hi),
             stringsAsFactors = FALSE)
         },
         # Replicate values of every bootstrap (optional "detail" sections of the files).
@@ -2105,7 +2172,7 @@ server_general_stats <- function(id, rv) {
         sprintf("Sub-samples (n = %d): %s", length(pops), paste(pops, collapse = ", ")),
         sprintf("Permutations: %s", npm),
         sprintf("Bootstrap replicates: %s", nb),
-        sprintf("Confidence level: %s", md$conf_level %||% input$conf_level_fst),
+        sprintf("Confidence level of bootstraps: %s", md$conf_level %||% input$conf_level_fst),
         sprintf("Seed: %s", .seed()),
         if (!is.null(nc)) sprintf("Complete multilocus genotypes per sample: %s; total = %d",
                                    paste(sprintf("%s = %d", names(nc), nc), collapse = ", "), sum(nc)),
@@ -2143,14 +2210,14 @@ server_general_stats <- function(id, rv) {
         on.exit(close(con), add = TRUE)
         .write_fst_params(con, res, gres)
 
-        writeLines("Section 1: FST per locus", con = con)
+        writeLines("Section 1: FST per locus and overall, confidence intervals (CI_L and CI_U) by bootstrap over individuals (BS/Indiv), over sub-samples (BS/Subs) and over loci (BS/Loci), standard errors (SE) and permutation p-values", con = con)
         pga_write_table(pga_fst_section(res$final_table, res$locus_boot_table), file = con)
         writeLines("", con = con)
 
         if (is.list(gres)) {
           gt <- gres$final_table[, c("ID", "G_obs", "p_ge", "p_gt")]
           names(gt) <- c("ID", "G_obs", "p_>=", "p_>")
-          writeLines("Section 2: G-based test of subdivision (multilocus genotypes)", con = con)
+          writeLines("Section 2: G-based test of subdivision (multilocus genotypes), G statistic (G_obs) and permutation p-values (p_>= : proportion of permuted G larger than or equal to G_obs; p_> : strictly larger)", con = con)
           pga_write_table(gt, file = con)
         } else {
           writeLines("Section 2: G-based test not computed", con = con)
@@ -2163,12 +2230,14 @@ server_general_stats <- function(id, rv) {
                        error = function(e) { showNotification(paste("Pairwise FST failed:", conditionMessage(e)), type = "warning"); NULL })
         writeLines("", con = con)
         if (!is.null(pw)) {
-          writeLines("Section 3: pairwise FST between sub-samples (multilocus)", con = con)
+          writeLines("Section 3: pairwise FST between sub-samples (multilocus), N1 and N2 = numbers of individuals of the two sub-samples, confidence intervals by BS/Indiv and BS/Loci, standard errors (SE) and G-based permutation p-value", con = con)
           pga_write_table(pw$overall, file = con)
           writeLines("", con = con)
-          writeLines("Section 4: pairwise FST between sub-samples, per locus", con = con)
+          writeLines("Section 4: pairwise FST between sub-samples, per locus, confidence intervals and standard errors by BS/Indiv, G-based permutation p-values", con = con)
           pga_write_table(pw$per_locus, file = con)
         }
+        writeLines("", con = con)
+        writeLines(pga_legend("fst"), con = con)
 
         if (isTRUE(input$fst_detail)) {
           writeLines("", con = con)
@@ -2219,7 +2288,7 @@ server_general_stats <- function(id, rv) {
         sprintf("Loci (n = %d): %s", length(loci), paste(loci, collapse = ", ")),
         sprintf("Sub-samples (n = %d): %s", length(pops), paste(pops, collapse = ", ")),
         sprintf("Bootstrap replicates: %s", nb),
-        sprintf("Confidence level: %s", md$conf_level %||% 0.95),
+        sprintf("Confidence level of bootstraps: %s", md$conf_level %||% 0.95),
         sprintf("Seed: %s", .seed()),
         ""
       )
@@ -2254,16 +2323,18 @@ server_general_stats <- function(id, rv) {
         con <- file(file, open = "w", encoding = "UTF-8")
         on.exit(close(con), add = TRUE)
         .write_div_params(con, res)
-        .write_div_section(con, "Section 1: HS per locus, bootstrap over individuals",
-                           pga_diversity_section(res$hs_indiv_tbl, "Observed_HS"))
-        .write_div_section(con, "Section 2: HS per locus, bootstrap over sub-samples",
-                           pga_diversity_section(res$hs_pop_tbl, "Observed_HS"))
-        .write_div_section(con, "Section 3: HS per sub-sample",
+        .write_div_section(con, "Section 1: HS (gene diversity within sub-samples) per locus and overall, confidence intervals (CI_L and CI_U) and standard errors (SE) by bootstrap over individuals (BS/Indiv)",
+                           pga_diversity_section(res$hs_indiv_tbl, "Observed_HS", "indiv"))
+        .write_div_section(con, "Section 2: HS per locus and overall, confidence intervals and standard errors by bootstrap over sub-samples (BS/Subs)",
+                           pga_diversity_section(res$hs_pop_tbl, "Observed_HS", "subs"))
+        .write_div_section(con, "Section 3: HS per sub-sample, confidence intervals and standard errors by BS/Indiv and BS/Loci",
                            pga_hs_pop_section(res$hs_per_pop_tbl, res$hs_indiv_tbl, res$locus_boot_table))
-        .write_div_section(con, "Section 4: HT per locus",
+        .write_div_section(con, "Section 4: HT (total gene diversity) per locus and overall, confidence intervals and standard errors by BS/Indiv and by BS/Subs",
                            pga_diversity_section(res$ht_table, "Observed_HT"))
-        .write_div_section(con, "Section 5: HS and HT (multilocus)",
+        .write_div_section(con, "Section 5: HS and HT (multilocus), confidence intervals and standard errors by BS/Indiv, BS/Subs and BS/Loci",
                            pga_multilocus_section(res$locus_boot_table, res$subs_overall, stats = c("HS", "HT")))
+        writeLines(pga_legend("div"), con = con)
+        writeLines("", con = con)
 
         if (isTRUE(input$div_detail)) {
           writeLines("DETAIL: bootstrap replicate values", con = con)

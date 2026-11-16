@@ -62,3 +62,23 @@ test_that("observed values do not depend on the sub-sample correction", {
   expect_equal(unname(b$FST_obs), unname(o$FST), tolerance = 1e-12)
   expect_equal(b$FST_overall_obs, o$FST_overall_ratio_of_sums, tolerance = 1e-12)
 })
+
+test_that("boot_subs_wc84_cpp: sub-samples resampled, FST/HT biased low, HS and FIS unbiased", {
+  set.seed(7)
+  r <- 8L; n <- 50L; L <- 10L; K <- 20L
+  m <- matrix(0L, r * n, L + 1L); m[, 1] <- rep(seq_len(r), each = n)
+  for (l in seq_len(L)) { p0 <- rgamma(K, 3); p0 <- p0 / sum(p0)
+    for (i in seq_len(r)) { pi <- rgamma(K, 82 * p0 + 1e-3); pi <- pi / sum(pi)
+      a <- matrix(sample.int(K, 2L * n, replace = TRUE, prob = pi), n, 2L)
+      m[(i - 1L) * n + seq_len(n), l + 1L] <- a[, 1] * 100L + a[, 2] } }
+  colnames(m) <- c("pop", paste0("L", seq_len(L)))
+  obs <- observed_wc84_stats_cpp(m, 1L, 0L, 100L)
+  bs <- boot_subs_wc84_cpp(m, 1L, 0L, 100L, 600L, 3, 1L)
+  expect_equal(dim(bs$FST_boot), c(600L, L))
+  expect_equal(bs$boot_type, "subsamples")
+  expect_lt(mean(bs$FST_overall_boot), obs$FST_overall_ratio_of_sums)
+  expect_lt(mean(bs$HT_overall_boot), mean(obs$HT))
+  expect_equal(mean(bs$HS_overall_boot), mean(obs$HS), tolerance = 0.005)
+  ci <- pga_ci_bias_shift(obs$FST_overall_ratio_of_sums, bs$FST_overall_boot, 0.95)
+  expect_true(ci[["lo"]] < obs$FST_overall_ratio_of_sums && obs$FST_overall_ratio_of_sums < ci[["hi"]])
+})

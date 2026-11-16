@@ -351,49 +351,61 @@ pga_overall_by_population <- function(mat, base = 1000L, missing_code = 0L) {
 # Table builders for the Subdivision / Diversities output files (pure functions)
 # ============================================================================
 
-# Subdivision, section 1: FST per locus (bootstrap over sub-samples) with the
-# permutation p-value, then two Overall rows: one per type of bootstrap.
-#   final_table      : ID, Observed_FST, P_value, CI_L, CI_U (+ other columns), Overall last
+# Subdivision, section 1: FST per locus. Every interval is labelled by what was
+# resampled: individuals within sub-samples (_indiv), whole sub-samples (_subs) and
+# loci (_loci; Overall row only). One Overall row carries the three bootstraps.
+# Standard errors and p-values come last.
+#   final_table      : ID, Observed_FST, CI_L, CI_U (BS/Indiv), SE, SE_subs, CI_L_subs,
+#                      CI_U_subs, P_value, P_theta_gt, P_theta_lt; Overall last
 #   locus_boot_table : Statistic, Observed, SE, CI_L, CI_U (bootstrap over loci)
 pga_fst_section <- function(final_table, locus_boot_table) {
   ft  <- final_table
   n   <- nrow(ft)
-  se  <- if ("SE" %in% names(ft)) ft$SE else rep(NA_real_, n)
-  pg <- if ("P_theta_gt" %in% names(ft)) ft$P_theta_gt else rep(NA_real_, n)
-  pl <- if ("P_theta_lt" %in% names(ft)) ft$P_theta_lt else rep(NA_real_, n)
-  out <- data.frame(ID = ft$ID, Observed_FST = ft$Observed_FST, SE = se,
-                    P_value = ft$P_value, P_theta_gt = pg, P_theta_lt = pl,
-                    CI_L = ft$CI_L, CI_U = ft$CI_U,
-                    stringsAsFactors = FALSE)
-  out$ID[n] <- "Overall (BS/Indiv)"
+  col <- function(nm) if (nm %in% names(ft)) ft[[nm]] else rep(NA_real_, n)
   lb  <- locus_boot_table[locus_boot_table$Statistic == "FST", , drop = FALSE]
-  rbind(out, data.frame(ID = "Overall (BS/Loci)", Observed_FST = ft$Observed_FST[n],
-                        SE = if (nrow(lb)) lb$SE else NA_real_,
-                        P_value = ft$P_value[n], P_theta_gt = pg[n], P_theta_lt = pl[n],
-                        CI_L = if (nrow(lb)) lb$CI_L else NA_real_,
-                        CI_U = if (nrow(lb)) lb$CI_U else NA_real_,
-                        stringsAsFactors = FALSE))
+  gl  <- function(nm) { v <- rep(NA_real_, n); if (nrow(lb) && nm %in% names(lb)) v[n] <- lb[[nm]]; v }
+  out <- data.frame(ID = ft$ID, Observed_FST = ft$Observed_FST,
+                    CI_L_indiv = ft$CI_L, CI_U_indiv = ft$CI_U,
+                    CI_L_subs = col("CI_L_subs"), CI_U_subs = col("CI_U_subs"),
+                    CI_L_loci = gl("CI_L"), CI_U_loci = gl("CI_U"),
+                    SE_indiv = col("SE"), SE_subs = col("SE_subs"), SE_loci = gl("SE"),
+                    P_value = ft$P_value, P_theta_gt = col("P_theta_gt"), P_theta_lt = col("P_theta_lt"),
+                    stringsAsFactors = FALSE)
+  out
 }
 
-# Multilocus estimators (FIS, FST, FIT, HS, HT): observed value, standard error and
-# CI from the bootstrap over LOCI, and standard error and CI from the bootstrap
-# over INDIVIDUALS (bias-shifted).
+# Multilocus estimators (FIS, FST, FIT, HS, HT): observed value, then the three
+# bootstraps: over loci, over individuals and over sub-samples (each bias-shifted
+# except loci), standard errors after the intervals.
 pga_multilocus_section <- function(locus_boot_table, subs_overall,
                                    stats = c("FIS", "FST", "FIT", "HS", "HT")) {
   ord <- stats
   lb  <- locus_boot_table[match(ord, locus_boot_table$Statistic), , drop = FALSE]
   sb  <- subs_overall[match(ord, subs_overall$Statistic), , drop = FALSE]
   data.frame(Statistic = ord, Observed = lb$Observed,
-             SE_loci = lb$SE, CI_L_loci = lb$CI_L, CI_U_loci = lb$CI_U,
-             SE_indiv = sb$SE_indiv, CI_L_indiv = sb$CI_L_subs, CI_U_indiv = sb$CI_U_subs,
+             CI_L_indiv = sb$CI_L_indiv, CI_U_indiv = sb$CI_U_indiv,
+             CI_L_subs = sb$CI_L_subs, CI_U_subs = sb$CI_U_subs,
+             CI_L_loci = lb$CI_L, CI_U_loci = lb$CI_U,
+             SE_indiv = sb$SE_indiv, SE_subs = sb$SE_subs, SE_loci = lb$SE,
              stringsAsFactors = FALSE)
 }
 
-# A per-locus HS / HT table as written in the files: standard error instead of the
-# bootstrap mean (which has no use for the reader).
-pga_diversity_section <- function(tbl, obs_col) {
-  out <- data.frame(ID = tbl$ID, tbl[[obs_col]], SE = tbl$Boot_SE, CI_L = tbl$CI_L, CI_U = tbl$CI_U,
-                    stringsAsFactors = FALSE)
+# A per-locus HS / HT table as written in the files. `boot` ("indiv" or "subs") names
+# the bootstrap of a table that has a single interval; a table carrying both
+# (columns CI_L/CI_U = BS/Indiv and CI_L_subs/CI_U_subs = BS/Subs, as the HT table)
+# is written with both, each labelled. Standard errors come last.
+pga_diversity_section <- function(tbl, obs_col, boot = "indiv") {
+  if ("CI_L_subs" %in% names(tbl)) {
+    out <- data.frame(ID = tbl$ID, tbl[[obs_col]],
+                      CI_L_indiv = tbl$CI_L, CI_U_indiv = tbl$CI_U,
+                      CI_L_subs = tbl$CI_L_subs, CI_U_subs = tbl$CI_U_subs,
+                      SE_indiv = tbl$Boot_SE, SE_subs = tbl$SE_subs,
+                      stringsAsFactors = FALSE)
+  } else {
+    out <- data.frame(ID = tbl$ID, tbl[[obs_col]], tbl$CI_L, tbl$CI_U, tbl$Boot_SE,
+                      stringsAsFactors = FALSE)
+    names(out)[3:5] <- c(paste0("CI_L_", boot), paste0("CI_U_", boot), paste0("SE_", boot))
+  }
   names(out)[2] <- obs_col
   out
 }
@@ -584,4 +596,40 @@ pga_se_p_last <- function(df) {
 # write.table() with tab separation, SE and p-value columns last.
 pga_write_table <- function(x, file, ...) {
   utils::write.table(pga_se_p_last(x), file = file, sep = "\t", row.names = FALSE, quote = FALSE)
+}
+
+# ---------------------------------------------------------------------------
+# Abbreviation legend written under the tables of the output files.
+# `kind` selects the relevant abbreviations; returns a character vector of lines.
+# ---------------------------------------------------------------------------
+pga_legend <- function(kind = c("fis", "fit", "fst", "div", "null", "ibd")) {
+  kind <- match.arg(kind)
+  d <- c(
+    ID         = "ID = identifier (locus, sub-sample or pair of sub-samples)",
+    BS_indiv   = "BS/Indiv = bootstrap over individuals (individuals resampled with replacement within each sub-sample)",
+    BS_subs    = "BS/Subs = bootstrap over sub-samples (whole sub-samples resampled with replacement)",
+    BS_loci    = "BS/Loci = bootstrap over loci (loci resampled with replacement)",
+    CI         = "CI_L and CI_U = lower and upper limits of the confidence interval; suffixes _indiv, _subs and _loci give the bootstrap used",
+    SE         = "SE = standard error (standard deviation of the bootstrap replicates); suffixes _indiv, _subs and _loci give the bootstrap used",
+    P          = "P_value = p-value of the permutation test",
+    FIS        = "FIS = within sub-sample deviation from panmixia (Weir and Cockerham 1984)",
+    FIT        = "FIT = deviation from panmixia over the whole sample (Weir and Cockerham 1984)",
+    FST        = "FST = differentiation among sub-samples (Weir and Cockerham 1984)",
+    HS         = "HS = gene diversity within sub-samples (Nei and Chesser 1983)",
+    HT         = "HT = total gene diversity (Nei and Chesser 1983)",
+    Overall    = "Overall = multilocus value (ratio of sums over loci)",
+    P_theta    = "P_theta_gt and P_theta_lt = permutation p-values of the FST estimate for the alternatives FST larger and FST smaller than expected under no differentiation",
+    FSTENA     = "FST_ENA = FST corrected for null alleles (ENA method, Chapuis and Estoup 2007)",
+    FSTraw     = "FST_raw = FST not corrected for null alleles",
+    INA        = "INA = individual null allele correction of the genotypes",
+    IBD        = "b = slope of FST/(1-FST) against the natural logarithm of geographic distance; Nb = 1/b (neighbourhood size); Nem = Nb/(2*pi) (product of effective density and dispersal)"
+  )
+  keys <- switch(kind,
+    fis  = c("ID", "BS_indiv", "BS_subs", "BS_loci", "CI", "SE", "P", "FIS", "Overall"),
+    fit  = c("ID", "BS_indiv", "BS_subs", "BS_loci", "CI", "SE", "P", "FIT", "Overall"),
+    fst  = c("ID", "BS_indiv", "BS_subs", "BS_loci", "CI", "SE", "P", "FST", "P_theta", "Overall"),
+    div  = c("ID", "BS_indiv", "BS_subs", "BS_loci", "CI", "SE", "HS", "HT", "Overall"),
+    null = c("ID", "BS_indiv", "BS_subs", "CI", "SE", "P", "FSTENA", "FSTraw", "INA"),
+    ibd  = c("ID", "BS_indiv", "BS_loci", "CI", "SE", "P", "FSTENA", "IBD"))
+  c("Abbreviations:", unname(d[keys]))
 }

@@ -105,17 +105,30 @@ test_that("pga_fis_pop_loci_boot(): observed FIS per population equals wc_fis_by
 
 test_that("table builders give the expected columns and Overall rows", {
   ft <- data.frame(ID = c("L1", "L2", "Overall"), Observed_FST = c(.01, .02, .015),
-                   Boot_Mean = 0, Boot_Median = 0, P_value = c(.001, .01, .002),
-                   CI_L = c(0, 0, .005), CI_U = c(.02, .04, .03))
+                   Boot_Mean = 0, Boot_Median = 0, P_value = c(.001, .01, .002), SE = .01,
+                   CI_L = c(0, 0, .005), CI_U = c(.02, .04, .03),
+                   SE_subs = .02, CI_L_subs = c(-.01, -.02, 0), CI_U_subs = c(.03, .05, .04))
   lb <- data.frame(Statistic = c("FST", "FIT", "FIS", "HS", "HT"), Observed = 1:5 / 10, Boot_Mean = 0,
                    SE = .01, CI_L = 0, CI_U = 1)
   s1 <- pga_fst_section(ft, lb)
-  expect_equal(s1$ID, c("L1", "L2", "Overall (BS/Indiv)", "Overall (BS/Loci)"))
-  expect_named(s1, c("ID", "Observed_FST", "SE", "P_value", "P_theta_gt", "P_theta_lt", "CI_L", "CI_U"))
-  so <- data.frame(Statistic = c("FIS", "FST", "FIT", "HS", "HT"), SE_indiv = .01, CI_L_subs = 0, CI_U_subs = 1)
+  expect_equal(s1$ID, c("L1", "L2", "Overall"))
+  expect_named(s1, c("ID", "Observed_FST", "CI_L_indiv", "CI_U_indiv", "CI_L_subs", "CI_U_subs",
+                     "CI_L_loci", "CI_U_loci", "SE_indiv", "SE_subs", "SE_loci",
+                     "P_value", "P_theta_gt", "P_theta_lt"))
+  expect_true(all(is.na(s1$CI_L_loci[1:2])) && is.finite(s1$CI_L_loci[3]))
+  so <- data.frame(Statistic = c("FIS", "FST", "FIT", "HS", "HT"), SE_indiv = .01, CI_L_indiv = 0, CI_U_indiv = 1,
+                   SE_subs = .02, CI_L_subs = 0, CI_U_subs = 1)
   ml <- pga_multilocus_section(lb, so)
   expect_equal(ml$Statistic, c("FIS", "FST", "FIT", "HS", "HT"))                      # FIS, FST, FIT order
-  expect_named(ml, c("Statistic", "Observed", "SE_loci", "CI_L_loci", "CI_U_loci", "SE_indiv", "CI_L_indiv", "CI_U_indiv"))
+  expect_named(ml, c("Statistic", "Observed", "CI_L_indiv", "CI_U_indiv", "CI_L_subs", "CI_U_subs",
+                     "CI_L_loci", "CI_U_loci", "SE_indiv", "SE_subs", "SE_loci"))
+  ht <- data.frame(ID = "L1", Observed_HT = .9, Boot_Mean = .9, Boot_SE = .01, CI_L = .8, CI_U = 1,
+                   SE_subs = .02, CI_L_subs = .7, CI_U_subs = 1.1)
+  expect_named(pga_diversity_section(ht, "Observed_HT"),
+               c("ID", "Observed_HT", "CI_L_indiv", "CI_U_indiv", "CI_L_subs", "CI_U_subs", "SE_indiv", "SE_subs"))
+  hs <- ht[, 1:6]; names(hs)[2] <- "Observed_HS"
+  expect_named(pga_diversity_section(hs, "Observed_HS", "subs"),
+               c("ID", "Observed_HS", "CI_L_subs", "CI_U_subs", "SE_subs"))
 })
 
 
