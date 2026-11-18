@@ -322,15 +322,23 @@ server_isolation_by_distance <- function(id, rv) {
       na <- tryCatch(na_results_r(), error = function(e) NULL)
       if (isTRUE(identical(input$ibd_source, "external")) || is.null(na) ||
           is.null(na$boot_indiv$reps)) return(NULL)
-      kind <- if (grepl("raw", col_avg, ignore.case = TRUE)) "raw"
-              else if (grepl("ENA", col_avg) || identical(col_avg, "FR")) "ena" else return(NULL)
+      # Which replicates match the genetic-distance column chosen for the regression
+      # (FR = linearised FST, used as is for FST_* and DCSE_* columns).
+      spec <- if (grepl("^FR_raw$", col_avg))        list("pair_raw", TRUE)
+              else if (grepl("^FR(_ENA)?$", col_avg)) list("pair_ena", TRUE)
+              else if (grepl("^FST_raw$", col_avg))   list("pair_raw", FALSE)
+              else if (grepl("^FST_ENA$", col_avg))   list("pair_ena", FALSE)
+              else if (grepl("^DCSE_raw$", col_avg))  list("dcse_raw", FALSE)
+              else if (grepl("^DCSE_INA$", col_avg))  list("dcse_ina", FALSE)
+              else return(NULL)
       lg   <- na$fst_pair$long
-      reps <- if (kind == "raw") na$boot_indiv$reps$pair_raw else na$boot_indiv$reps$pair_ena
+      reps <- na$boot_indiv$reps[[spec[[1]]]]
+      lin  <- spec[[2]]
       k    <- match(paste(df$Pop1, df$Pop2), paste(lg$Pop1, lg$Pop2))
       if (is.null(reps) || anyNA(k) || !is.finite(b_obs)) return(NULL)
       reps <- reps[, k, drop = FALSE]
       slope <- apply(reps, 1, function(f) {
-        y <- .linearise(f); ok <- is.finite(y) & is.finite(x)
+        y <- if (lin) .linearise(f) else f; ok <- is.finite(y) & is.finite(x)
         if (sum(ok) < 3L || stats::var(x[ok]) == 0) return(NA_real_)
         stats::cov(x[ok], y[ok]) / stats::var(x[ok])
       })
@@ -410,7 +418,7 @@ server_isolation_by_distance <- function(id, rv) {
         writeLines(sprintf("Table 2: slope b, Nb and Nem with confidence intervals (CI_L_indiv and CI_U_indiv) and standard error (SE_indiv) by bootstrap over individuals (BS/Indiv: individuals resampled within sub-samples, %d replicates)", attr(bi, "n_boot")), con = con)
         write.table(bi, file = con, sep = "\t", row.names = FALSE, quote = FALSE, append = TRUE)
       } else {
-        writeLines("Table 2: bootstrap over individuals (BS/Indiv) not available (pairwise table uploaded from a file, or genetic distance column other than FR / FR_raw)", con = con)
+        writeLines("Table 2: bootstrap over individuals (BS/Indiv) not available (pairwise table uploaded from a file, or genetic distance column other than FR, FR_raw, FST_raw, FST_ENA, DCSE_raw, DCSE_INA)", con = con)
       }
       writeLines("", con = con)
       writeLines(pga_legend("ibd"), con = con)

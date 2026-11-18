@@ -430,6 +430,35 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// na_stats_cpp
+List na_stats_cpp(List G, int base, IntegerVector nullhomo);
+RcppExport SEXP _pgacmdr_na_stats_cpp(SEXP GSEXP, SEXP baseSEXP, SEXP nullhomoSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< List >::type G(GSEXP);
+    Rcpp::traits::input_parameter< int >::type base(baseSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type nullhomo(nullhomoSEXP);
+    rcpp_result_gen = Rcpp::wrap(na_stats_cpp(G, base, nullhomo));
+    return rcpp_result_gen;
+END_RCPP
+}
+// na_boot_indiv_cpp
+List na_boot_indiv_cpp(List G, int base, IntegerVector nullhomo, int B, double seed, int n_threads);
+RcppExport SEXP _pgacmdr_na_boot_indiv_cpp(SEXP GSEXP, SEXP baseSEXP, SEXP nullhomoSEXP, SEXP BSEXP, SEXP seedSEXP, SEXP n_threadsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< List >::type G(GSEXP);
+    Rcpp::traits::input_parameter< int >::type base(baseSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type nullhomo(nullhomoSEXP);
+    Rcpp::traits::input_parameter< int >::type B(BSEXP);
+    Rcpp::traits::input_parameter< double >::type seed(seedSEXP);
+    Rcpp::traits::input_parameter< int >::type n_threads(n_threadsSEXP);
+    rcpp_result_gen = Rcpp::wrap(na_boot_indiv_cpp(G, base, nullhomo, B, seed, n_threads));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_pgacmdr_boot_subsamples_fst_cpp", (DL_FUNC) &_pgacmdr_boot_subsamples_fst_cpp, 2},
@@ -460,6 +489,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_pgacmdr_ld_pvalues_cpp", (DL_FUNC) &_pgacmdr_ld_pvalues_cpp, 5},
     {"_pgacmdr_mantel_genepop_cpp", (DL_FUNC) &_pgacmdr_mantel_genepop_cpp, 4},
     {"_pgacmdr_mantel_plus1_cpp", (DL_FUNC) &_pgacmdr_mantel_plus1_cpp, 3},
+    {"_pgacmdr_na_stats_cpp", (DL_FUNC) &_pgacmdr_na_stats_cpp, 3},
+    {"_pgacmdr_na_boot_indiv_cpp", (DL_FUNC) &_pgacmdr_na_boot_indiv_cpp, 6},
     {NULL, NULL, 0}
 };
 

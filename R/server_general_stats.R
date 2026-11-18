@@ -1701,7 +1701,7 @@ server_general_stats <- function(id, rv) {
         ci <- vapply(seq_along(loc), function(j)
           pga_ci_bias_shift(obs[j], boot_mat[, j], conf_level), numeric(2))
         cio <- pga_ci_bias_shift(obs_overall, boot_overall, conf_level)
-        list(mean = colMeans(boot_mat, na.rm = TRUE), ci_lo = ci[1, ], ci_hi = ci[2, ],
+        list(mean = colMeans(boot_mat, na.rm = TRUE), ci_lo = stats::setNames(ci[1, ], loc), ci_hi = stats::setNames(ci[2, ], loc),
              se = apply(boot_mat, 2, stats::sd, na.rm = TRUE),
              overall_mean = mean(boot_overall, na.rm = TRUE),
              overall_ci_lo = cio[["lo"]], overall_ci_hi = cio[["hi"]],

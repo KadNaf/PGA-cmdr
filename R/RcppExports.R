@@ -113,3 +113,11 @@ mantel_plus1_cpp <- function(Xmat, Ymat, nperm) {
     .Call(`_pgacmdr_mantel_plus1_cpp`, Xmat, Ymat, nperm)
 }
 
+na_stats_cpp <- function(G, base, nullhomo) {
+    .Call(`_pgacmdr_na_stats_cpp`, G, base, nullhomo)
+}
+
+na_boot_indiv_cpp <- function(G, base, nullhomo, B, seed, n_threads) {
+    .Call(`_pgacmdr_na_boot_indiv_cpp`, G, base, nullhomo, B, seed, n_threads)
+}
+

@@ -12,7 +12,8 @@ load_na_env <- function() {
   }
   b <- NULL; for (e in ex) { b <- find_body(e); if (!is.null(b)) break }
   want <- c("em_freena", "weir_components_allele", "compute_fst_global_full",
-            "compute_fst_pairwise", "boot_indiv_na", "summarise_boot_indiv", "%||%")
+            "compute_fst_pairwise", "compute_dc_pairwise", "cs_distance", "make_ina_freq",
+            "boot_indiv_na", "summarise_boot_indiv", "%||%")
   env <- new.env(parent = asNamespace("pgacmdr"))
   for (s in as.list(b[[3]])[-1]) {
     if (is.call(s) && identical(s[[1]], as.name("<-")) && is.name(s[[2]]) && as.character(s[[2]]) %in% want)
@@ -43,6 +44,22 @@ test_that("BS/Indiv for null alleles: shapes, reproducibility across cores, CI c
   for (l in markers) { em[[l]] <- list()
     for (p in pops) em[[l]][[p]] <- env$em_freena(raw$gt[raw$Marker == l & raw$Population == p], 1000L) }
   g  <- env$compute_fst_global_full(em); pw <- env$compute_fst_pairwise(em)
+  # The native code reproduces the R reference functions on the observed data
+  # (differences below the 6-decimal rounding of the R output), in both codings.
+  for (mode in c("absent", "null_homo")) {
+    tr <- setNames(rep(mode, length(markers)), markers)
+    emm <- list()
+    for (l in markers) { emm[[l]] <- list()
+      for (p in pops) emm[[l]][[p]] <- env$em_freena(raw$gt[raw$Marker == l & raw$Population == p], 1000L, unname(tr[l])) }
+    gg <- env$compute_fst_global_full(emm); pp <- env$compute_fst_pairwise(emm); dd <- env$compute_dc_pairwise(emm)
+    G <- lapply(pops, function(p) sapply(markers, function(l) as.integer(raw$gt[raw$Marker == l & raw$Population == p])))
+    st <- na_stats_cpp(G, 1000L, as.integer(rep(mode == "null_homo", length(markers))))
+    expect_lt(abs(st$global_raw - gg$global_raw), 1e-6); expect_lt(abs(st$global_ena - gg$global_ena), 1e-6)
+    expect_lt(max(abs(st$loc_ena - gg$per_locus$FST_ENA)), 1e-6)
+    expect_lt(max(abs(st$pair_raw - pp$long$FST_raw)), 1e-6); expect_lt(max(abs(st$pair_ena - pp$long$FST_ENA)), 1e-6)
+    expect_lt(max(abs(st$dcse_raw - dd$long$DCSE_raw), na.rm = TRUE), 1e-6)
+    expect_lt(max(abs(st$dcse_ina - dd$long$DCSE_INA), na.rm = TRUE), 1e-6)
+  }
   b1 <- env$boot_indiv_na(raw, markers, pops, treats, 1000L, 40L, 11L, n_cores = 1L)
   expect_equal(length(b1$glob_ena), 40L)
   expect_equal(dim(b1$loc_raw), c(40L, 3L))

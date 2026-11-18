@@ -956,68 +956,29 @@ server_null_alleles <- function(id, rv) {
     # ??????????????????????????????????????????????????????????????????????????
     boot_indiv_na <- function(raw_df, markers, pops, treats, base, nboot, seed,
                               progress_cb = NULL, n_cores = NULL) {
+      # Genotype matrices (individuals x loci), one per sub-sample.
       G <- lapply(pops, function(p) {
         d   <- raw_df[raw_df$Population == p, , drop = FALSE]
         ids <- unique(d$Individual)
-        m   <- matrix(0L, length(ids), length(markers), dimnames = list(NULL, markers))
+        m   <- matrix(0L, length(ids), length(markers))
         g   <- as.integer(ifelse(is.na(d$gt), 0L, d$gt))
         ok  <- d$Marker %in% markers
         m[cbind(match(d$Individual[ok], ids), match(d$Marker[ok], markers))] <- g[ok]
         m
       })
-      names(G) <- pops
-      set.seed(as.integer((seed + 7919L) %% .Machine$integer.max))
-      idx <- lapply(seq_len(nboot), function(b)
-        lapply(G, function(m) sample.int(nrow(m), nrow(m), replace = TRUE)))
-      empty <- list(rd=0.0, pfreq=numeric(0), genefreq_obs=numeric(0), H_ii=numeric(0),
-                    H_iX=numeric(0), N=0L, efpop=0L, n_absent=0L, n_null_homo=0L,
-                    alleles=integer(0), n_valid_geno=0L, treat="absent")
-      one <- function(ix) {
-        em_b <- list()
-        for (loc in markers) {
-          em_b[[loc]] <- list()
-          treat <- as.character(treats[loc] %||% "absent")
-          for (pop in pops) {
-            gts <- G[[pop]][ix[[pop]], loc]
-            em_b[[loc]][[pop]] <- if (length(gts) == 0L) empty else em_freena(gts, base, treat)
-          }
-        }
-        g  <- compute_fst_global_full(em_b)
-        pw <- compute_fst_pairwise(em_b)
-        list(go = c(g$global_raw, g$global_ena),
-             gl = cbind(g$per_locus$FST_raw, g$per_locus$FST_ENA),
-             pr = pw$long$FST_raw, pe = pw$long$FST_ENA)
-      }
-      if (is.null(n_cores)) {
-        n_cores <- if (.Platform$OS.type == "windows") 1L else
-          max(1L, min(8L, (parallel::detectCores(logical = FALSE) %||% 2L) - 1L))
-      }
-      out <- vector("list", nboot)
-      batch <- max(1L, n_cores * 5L)
-      done <- 0L
-      while (done < nboot) {
-        ii <- seq.int(done + 1L, min(nboot, done + batch))
-        res <- if (n_cores > 1L) parallel::mclapply(idx[ii], one, mc.cores = n_cores, mc.set.seed = FALSE)
-               else lapply(idx[ii], one)
-        bad <- vapply(res, function(x) inherits(x, "try-error") || is.null(x), logical(1))
-        if (any(bad)) res[bad] <- lapply(idx[ii][bad], one)   # a failed fork is redone serially
-        out[ii] <- res
-        done <- max(ii)
-        if (!is.null(progress_cb)) progress_cb(done / nboot)
-      }
-      list(
-        glob_raw = vapply(out, function(x) x$go[1], numeric(1)),
-        glob_ena = vapply(out, function(x) x$go[2], numeric(1)),
-        loc_raw  = do.call(rbind, lapply(out, function(x) x$gl[, 1])),
-        loc_ena  = do.call(rbind, lapply(out, function(x) x$gl[, 2])),
-        pair_raw = do.call(rbind, lapply(out, function(x) x$pr)),
-        pair_ena = do.call(rbind, lapply(out, function(x) x$pe)),
-        nboot = nboot, n_cores = n_cores)
+      nh <- as.integer(vapply(markers, function(l) identical(as.character(treats[l]), "null_homo"), logical(1)))
+      # Native code (src/na_boot_indiv.cpp): EM + FST + pairwise FST + DCSE on every
+      # replicate, parallel over replicates, same results whatever the thread count.
+      res <- na_boot_indiv_cpp(G, as.integer(base), nh, as.integer(nboot),
+                               as.numeric(seed %% 1000003L), as.integer(n_cores %||% 0L))
+      if (!is.null(progress_cb)) progress_cb(1)
+      res$nboot <- nboot
+      res
     }
 
     # Summaries of boot_indiv_na(): bias-shifted CI (observed - mean of replicates)
     # and standard error, for the global/per-locus FST and for each pair.
-    summarise_boot_indiv <- function(bi, fst_global, fst_pair, alpha) {
+    summarise_boot_indiv <- function(bi, fst_global, fst_pair, alpha, dc_pair = NULL) {
       cl <- 1 - alpha
       one <- function(obs, reps) {
         r <- reps[is.finite(reps)]
@@ -1049,6 +1010,15 @@ server_null_alleles <- function(id, rv) {
           pair$SE_FST_raw_indiv[k] <- a[["se"]]; pair$SE_FST_ENA_indiv[k] <- b[["se"]]
         }
       }
+      dl <- if (!is.null(dc_pair)) dc_pair$long else NULL
+      if (!is.null(dl) && nrow(dl) == nrow(pair) && !is.null(bi$dcse_raw) && ncol(bi$dcse_raw) == nrow(dl)) {
+        for (k in seq_len(nrow(dl))) {
+          a <- one(dl$DCSE_raw[k], bi$dcse_raw[, k]); b <- one(dl$DCSE_INA[k], bi$dcse_ina[, k])
+          pair$DCSE_raw_CI_lo_indiv[k] <- a[["lo"]]; pair$DCSE_raw_CI_hi_indiv[k] <- a[["hi"]]
+          pair$DCSE_INA_CI_lo_indiv[k] <- b[["lo"]]; pair$DCSE_INA_CI_hi_indiv[k] <- b[["hi"]]
+          pair$SE_DCSE_raw_indiv[k] <- a[["se"]]; pair$SE_DCSE_INA_indiv[k] <- b[["se"]]
+        }
+      }
       list(global = rbind(glob, loc), pair = pair)
     }
 
@@ -1059,7 +1029,7 @@ server_null_alleles <- function(id, rv) {
       req(db_ready())
       nboot      <- max(100L, min(99999L, as.integer(input$nboot %||% 5000L)))
       nboot_subs <- max(50L,  min(20000L, as.integer(input$nboot_subs %||% 500L)))
-      nboot_indiv <- max(100L, min(20000L, as.integer(input$nboot_indiv %||% 1000L)))
+      nboot_indiv <- max(100L, min(20000L, as.integer(input$nboot_indiv %||% 5000L)))
       alpha   <- as.numeric(input$alpha %||% 0.05)
       if (!is.finite(alpha) || alpha <= 0 || alpha >= 1) alpha <- 0.05
       ci      <- ci_bounds(alpha)
@@ -1150,7 +1120,7 @@ server_null_alleles <- function(id, rv) {
           })
 
         # 11. Bootstrap over individuals (individuals resampled within sub-samples;
-        #     EM and FST re-run on every replicate: this is the slowest step).
+        #     EM and all statistics re-run on every replicate, in native code).
         setProgress(0.75, detail = sprintf("Bootstrap over individuals (%d reps)...", nboot_indiv))
         bi_raw <- boot_indiv_na(raw_df, markers, pops, treats, base, nboot_indiv, seed,
           progress_cb = function(frac) {
@@ -1158,7 +1128,7 @@ server_null_alleles <- function(id, rv) {
               detail = sprintf("Bootstrap over individuals (%d / %d reps)...",
                                round(frac * nboot_indiv), nboot_indiv))
           })
-        boot_indiv <- summarise_boot_indiv(bi_raw, fst_global, fst_pair, alpha)
+        boot_indiv <- summarise_boot_indiv(bi_raw, fst_global, fst_pair, alpha, dc_pair)
         boot_indiv$reps_pair_raw <- bi_raw$pair_raw
         boot_indiv$reps_pair_ena <- bi_raw$pair_ena
         boot_indiv$reps <- bi_raw
