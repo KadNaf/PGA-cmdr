@@ -2286,7 +2286,8 @@ server_general_stats <- function(id, rv) {
           # scratch file that is appended after Section 3 at the end.
           tmp4 <- NULL; con4 <- NULL
           if (isTRUE(input$fst_pairs_loci)) { tmp4 <- tempfile("pga_sec4_"); con4 <- file(tmp4, open = "w", encoding = "UTF-8") }
-          on.exit({ if (!is.null(con4) && isOpen(con4)) close(con4); if (!is.null(tmp4)) unlink(tmp4) }, add = TRUE)
+          con4_open <- !is.null(con4)
+          on.exit({ if (con4_open) try(close(con4), silent = TRUE); if (!is.null(tmp4)) unlink(tmp4) }, add = TRUE)
           first3 <- TRUE; first4 <- TRUE
           if (isTRUE(input$fst_pairs))
             writeLines("Section 3: pairwise FST between sub-samples (multilocus), N1 and N2 = numbers of individuals of the two sub-samples, confidence intervals by BS/Indiv and BS/Loci, standard errors (SE) and G-based permutation p-value", con = con)
@@ -2311,7 +2312,7 @@ server_general_stats <- function(id, rv) {
             error = function(e) { showNotification(paste("Pairwise FST failed:", conditionMessage(e)), type = "warning"); NULL })
           writeLines("", con = con)
           if (!is.null(con4)) {
-            close(con4)
+            close(con4); con4_open <- FALSE
             writeLines("Section 4: pairwise FST between sub-samples, per locus, confidence intervals and standard errors by BS/Indiv, G-based permutation p-values", con = con)
             cin <- file(tmp4, open = "r", encoding = "UTF-8")
             repeat { ln <- readLines(cin, n = 50000L); if (!length(ln)) break; writeLines(ln, con = con, useBytes = TRUE) }
