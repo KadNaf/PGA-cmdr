@@ -293,6 +293,7 @@ server_import_data <- function(id, rv) {
     rv$tbl_formatted_preview <- "formatted_preview" # UI-only
     rv$tbl_hf                <- "hf"
     rv$db_tick <- 0L
+    rv$dataset_id <- 0L
     
     session$userData$db_path <- file.path(session_dir, "pgacmdr.duckdb")
     
@@ -868,5 +869,8 @@ server_import_data <- function(id, rv) {
         }
       )
     })
+    observeEvent(rv$db_tick, {
+      rv$null_alleles_results <- NULL
+    }, ignoreInit = TRUE)
   })
 }

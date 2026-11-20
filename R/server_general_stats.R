@@ -373,6 +373,9 @@ server_general_stats <- function(id, rv) {
     output$run_basic_stats <- downloadHandler(
       filename = function() paste0("general_stats_", Sys.Date(), ".zip"),
       content  = function(file) {
+        t0 <- Sys.time()
+        nid <- pga_notify_start()
+        on.exit(tryCatch(shiny::removeNotification(nid), error = function(e) NULL), add = TRUE)
         result_stats_select <- .run_basic_stats_computation()
         req(result_stats_select)
 
@@ -430,7 +433,9 @@ server_general_stats <- function(id, rv) {
           all_files <- c(all_files, p4)
         }
 
+        pga_append_time(p1, t0)
         zip::zip(zipfile = file, files = basename(all_files), root = tmpdir)
+        pga_notify_done(nid, t0)
       }
     )
     # =========================================================#
@@ -2716,5 +2721,15 @@ server_general_stats <- function(id, rv) {
 
     ###
 
+    # New dataset or new loci range: forget every result computed on the previous data.
+    observeEvent(rv$db_tick, {
+      for (rvl in list(result_stats_reactive, result_stats_download, result_stats_numeric_reactive,
+                       result_stats_display_rv, fis_boot_results, fis_boot_results_pop, fis_boot_timing,
+                       perm_results, fis_allele_results, result_stats_select_reactive,
+                       fit_boot_results, fit_boot_timing, fit_perm_results,
+                       fst_boot_results, fst_boot_timing, fst_parallel_meta,
+                       div_boot_results, div_boot_timing)) rvl(NULL)
+      basic_cache(list(key = NULL, value = NULL))
+    }, ignoreInit = TRUE)
   })
 }

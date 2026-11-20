@@ -322,5 +322,6 @@ server_LD <- function(id, rv) {
                      sprintf("Done in %s - file written", pga_fmt_duration(difftime(Sys.time(), t0, units = "secs"))))
       }
     )
+    observeEvent(rv$db_tick, { ld_results_store(NULL); ld_timing(NULL) }, ignoreInit = TRUE)
   })
 }

@@ -637,6 +637,7 @@ pga_legend <- function(kind = c("fis", "fit", "fst", "div", "null", "ibd")) {
     HT         = "HT = total gene diversity (Nei and Chesser 1983)",
     Overall    = "Overall = multilocus value",
     P_theta    = "P_theta_gt = proportion of permuted FST (theta) values larger than or equal to the observed one (test of FST > 0, i.e. structure); P_theta_lt = proportion smaller than or equal to the observed one (test of FST < 0); locus-level tests introduced by J. Goudet in FSTAT to spot unusual loci",
+    CI_na      = "CI_lo and CI_hi = lower and upper limits of the confidence interval; suffixes _indiv, _subs and _loci give the bootstrap used",
     FSTENA     = "FST_ENA = FST corrected for null alleles (ENA method, Chapuis and Estoup 2007)",
     FSTraw     = "FST_raw = FST not corrected for null alleles",
     INA        = "INA = individual null allele correction of the genotypes",
@@ -647,8 +648,8 @@ pga_legend <- function(kind = c("fis", "fit", "fst", "div", "null", "ibd")) {
     fit  = c("ID", "BS_indiv", "BS_subs", "BS_loci", "CI", "SE", "P", "FIT", "Overall"),
     fst  = c("ID", "BS_indiv", "BS_subs", "BS_loci", "CI", "SE", "P", "FST", "P_theta", "Overall"),
     div  = c("ID", "BS_indiv", "BS_subs", "BS_loci", "CI", "SE", "HS", "HT", "Overall"),
-    null = c("ID", "BS_indiv", "BS_subs", "CI", "SE", "P", "FSTENA", "FSTraw", "INA"),
-    ibd  = c("ID", "BS_indiv", "BS_loci", "CI", "SE", "P", "FSTENA", "IBD"))
+    null = c("ID", "BS_indiv", "BS_subs", "BS_loci", "CI_na", "SE", "FSTENA", "FSTraw", "INA"),
+    ibd  = c("ID", "BS_indiv", "BS_loci", "CI", "SE", "FSTENA", "IBD"))
   c("Abbreviations:", unname(d[keys]))
 }
 
@@ -675,6 +676,25 @@ pga_write_time <- function(con, t0) {
 pga_progress <- function(session, id, value, title = NULL) {
   tryCatch(shinyWidgets::updateProgressBar(session, id, value = value, title = title),
            error = function(e) invisible(NULL))
+}
+
+# Screen notification for modules whose output is a zip or has no progress bar:
+# "Writing" while the files are produced, then "Done in <time> - file written".
+pga_notify_start <- function(msg = "Computation in progress - writing the file...") {
+  tryCatch(shiny::showNotification(msg, type = "message", duration = NULL), error = function(e) NULL)
+}
+pga_notify_done <- function(id, t0) {
+  tryCatch({
+    if (!is.null(id)) shiny::removeNotification(id)
+    shiny::showNotification(sprintf("Done in %s - file written.",
+                                    pga_fmt_duration(difftime(Sys.time(), t0, units = "secs"))),
+                            type = "message", duration = NULL)
+  }, error = function(e) NULL)
+}
+# Appends the "Computation time" line to a text file that is already written.
+pga_append_time <- function(path, t0) {
+  cat("\n", sprintf("Computation time: %s\n", pga_fmt_duration(difftime(Sys.time(), t0, units = "secs"))),
+      file = path, append = TRUE, sep = "")
 }
 
 # Header block + legend written at the TOP of an output file (after the parameters).

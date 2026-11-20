@@ -611,11 +611,23 @@ reset_downstream_state <- function(rv) {
   rv$preview_meta <- NULL
   rv$det <- NULL
   rv$colnames_all <- NULL
-  
+  rv$load_status  <- NULL
+  rv$null_alleles_results <- NULL   # results computed on the previous dataset
+
   if (!is.null(rv$con)) {
     try(.duckdb_clear_params(rv$con), silent = TRUE)
+    # Drop the tables built from the previous dataset: until the new data are
+    # applied, no module can silently go on analysing the old ones.
+    for (tb in c(rv$tbl_hf, rv$tbl_meta, rv$tbl_formatted, rv$tbl_formatted_preview)) {
+      if (!is.null(tb) && nzchar(tb))
+        try(DBI::dbExecute(rv$con, sprintf("DROP TABLE IF EXISTS %s;", .sql_ident(tb))), silent = TRUE)
+    }
   }
-  
+  # New dataset: every module resets its stored results when db_tick changes;
+  # dataset_id changes ONLY for a new file (not when the loci range is re-applied).
+  rv$dataset_id <- (rv$dataset_id %||% 0L) + 1L
+  rv$db_tick    <- (rv$db_tick %||% 0L) + 1L
+  invisible(TRUE)
 }
 
 # .duckdb_import_raw <- function(con, tbl_raw, file_path, sep, header) {

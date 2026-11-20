@@ -100,6 +100,16 @@ Pop2        145  145     92   92
 Missing genotypes are coded as `0` (or `0/0`) by default and are
 customisable on import.
 
+## Analysing another dataset in the same session
+
+You do not need to close PGA-cmdr to analyse another file. Importing a new file
+(or loading the default data again) clears the previous data and **all** stored
+results in every module, including the Null Alleles results used by Isolation by
+distance. Choose the population column and the loci range, click *Apply*, and
+every module works on the new data. Pairwise or distance files uploaded in
+Isolation by distance or Mantel belong to the dataset they were loaded with; after
+a new import, upload the matching file.
+
 ## Setting the loci range on import
 
 Once the file is loaded, a numbered **Column reference** table appears at

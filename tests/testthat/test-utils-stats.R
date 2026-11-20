@@ -210,3 +210,22 @@ test_that("duration formatting and many-loci warning", {
   expect_equal(pga_fmt_duration(7384), "2 h 03 min 04 s")
   expect_null(pga_many_loci_warning(50)); expect_match(pga_many_loci_warning(51), "hours")
 })
+
+test_that("pga_append_time adds the computation time line at the end of a file", {
+  f <- tempfile(fileext = ".txt"); writeLines(c("a\tb", "1\t2"), f)
+  pga_append_time(f, Sys.time() - 3)
+  l <- readLines(f); expect_match(l[length(l)], "^Computation time: [0-9.]+ s$"); expect_equal(l[1:2], c("a\tb", "1\t2"))
+})
+
+test_that("a new dataset resets the downstream state (results, tick, dataset id)", {
+  skip_if_not_installed("shiny")
+  rv <- shiny::reactiveValues(db_tick = 3L, dataset_id = 1L, null_alleles_results = list(old = TRUE),
+                              load_status = "x", preview_raw = 1, con = NULL)
+  shiny::isolate(reset_downstream_state(rv))
+  shiny::isolate({
+    expect_null(rv$null_alleles_results)
+    expect_null(rv$load_status)
+    expect_equal(rv$db_tick, 4L)
+    expect_equal(rv$dataset_id, 2L)
+  })
+})

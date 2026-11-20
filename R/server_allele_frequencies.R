@@ -337,6 +337,9 @@ ORDER BY lo._lo_rank ASC, f.Population, f.Allele",
     output$update_fstat <- downloadHandler(
       filename = function() fstat_out_filename(),
       content  = function(file) {
+        t0 <- Sys.time()
+        nid <- pga_notify_start()
+        on.exit(tryCatch(shiny::removeNotification(nid), error = function(e) NULL), add = TRUE)
         fstat_shown_r(TRUE)
         wide <- fstat_wide_r()
         req(wide)
@@ -346,7 +349,10 @@ ORDER BY lo._lo_rank ASC, f.Population, f.Allele",
         wide <- wide[wide$Row_type != "div_stat", , drop = FALSE]
         write.table(wide[, c("Locus", "Row_label", pops, "Global")], file = file,
                     sep = "\t", row.names = FALSE, quote = FALSE)
+        pga_append_time(file, t0)
+        pga_notify_done(nid, t0)
       }
     )
+    observeEvent(rv$db_tick, { fstat_shown_r(FALSE) }, ignoreInit = TRUE)
   })
 }

@@ -18,6 +18,9 @@ server_isolation_by_distance <- function(id, rv) {
       TRUE
     })
 
+    .stale_msg <- paste0("This file was uploaded for the previous dataset. Upload the file that matches ",
+                         "the new dataset (nothing from the old dataset is reused).")
+
     # -- Null Alleles module results (shared via rv - nothing recomputed) ----
     na_results_r <- reactive({
       r <- rv$null_alleles_results
@@ -169,6 +172,7 @@ server_isolation_by_distance <- function(id, rv) {
     #    Rousset's linearisation, lnDgeo from Dgeo_m) or left NA otherwise.
     full_pair_table_external_r <- reactive({
       shiny::req(input$ibd_ext_file)
+      shiny::validate(shiny::need(identical(ext_ver$ibd, rv$dataset_id %||% 0L), .stale_msg))
       ext <- .mt_read_file(input$ibd_ext_file, input$ibd_ext_sep, input$ibd_ext_header)
       nm <- names(ext)
       pop1_col <- .guess_col(nm, c("^Pop1$", "^Sub_sample_1$", "^Farm1$", "^ID1$"), nm[1])
@@ -459,6 +463,8 @@ server_isolation_by_distance <- function(id, rv) {
       filename = function() paste0(ibd_out_root_r(), "IBD-", Sys.Date(), ".zip"),
       content  = function(file) {
         t0 <- Sys.time()
+        nid <- pga_notify_start()
+        on.exit(tryCatch(shiny::removeNotification(nid), error = function(e) NULL), add = TRUE)
         r <- .run_ibd_computation()
         ibd_results_store(r)
         tmpdir <- tempfile("pga_ibd_export_"); dir.create(tmpdir)
@@ -471,6 +477,7 @@ server_isolation_by_distance <- function(id, rv) {
         con2 <- file(p2, open = "w", encoding = "UTF-8"); .write_ibd_params(con2); close(con2)
 
         zip::zip(zipfile = file, files = basename(c(p1, p2)), root = tmpdir)
+        pga_notify_done(nid, t0)
       }
     )
 
@@ -571,6 +578,7 @@ server_isolation_by_distance <- function(id, rv) {
         df <- full_pair_table_r()
         if (isTRUE(input$mt_use_extra)) {
           shiny::req(input$mt_extra_file)
+          shiny::validate(shiny::need(identical(ext_ver$mt_extra, rv$dataset_id %||% 0L), .stale_msg))
           extra <- .mt_read_file(input$mt_extra_file, input$mt_extra_sep, input$mt_extra_header)
           shiny::validate(shiny::need(ncol(extra) >= 3L,
             "Extra file must have 2 ID columns + at least 1 distance column."))
@@ -587,6 +595,7 @@ server_isolation_by_distance <- function(id, rv) {
         df
       } else {
         shiny::req(input$mt_file)
+        shiny::validate(shiny::need(identical(ext_ver$mt, rv$dataset_id %||% 0L), .stale_msg))
         .mt_read_file(input$mt_file, input$mt_sep, input$mt_header)
       }
     })
@@ -928,6 +937,8 @@ server_isolation_by_distance <- function(id, rv) {
       filename = function() paste0(mt_out_root_r(), "-Mantel-Res.zip"),
       content  = function(file) {
         t0 <- Sys.time()
+        nid <- pga_notify_start()
+        on.exit(tryCatch(shiny::removeNotification(nid), error = function(e) NULL), add = TRUE)
         r <- .run_mantel_computation()
         mantel_results_store(r)
         d <- .mantel_summary_df(r)
@@ -943,9 +954,19 @@ server_isolation_by_distance <- function(id, rv) {
         close(con)
 
         zip::zip(zipfile = file, files = basename(p1), root = tmpdir)
+        pga_notify_done(nid, t0)
       }
     )
 
 
+    observeEvent(rv$db_tick, { ibd_results_store(NULL); mantel_results_store(NULL) }, ignoreInit = TRUE)
+
+    # Files uploaded in this module belong to the dataset that was loaded when they
+    # were chosen: after a new import they are ignored (with a message) instead of
+    # being mixed with the new data.
+    ext_ver <- reactiveValues(ibd = NULL, mt = NULL, mt_extra = NULL)
+    observeEvent(input$ibd_ext_file,  ext_ver$ibd      <- rv$dataset_id %||% 0L)
+    observeEvent(input$mt_file,       ext_ver$mt       <- rv$dataset_id %||% 0L)
+    observeEvent(input$mt_extra_file, ext_ver$mt_extra <- rv$dataset_id %||% 0L)
   })
 }
