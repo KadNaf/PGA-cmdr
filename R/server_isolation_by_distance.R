@@ -406,10 +406,10 @@ server_isolation_by_distance <- function(id, rv) {
     ibd_results_r <- function() ibd_results_store()
 
     # -- Results file: the regression summary table only --------------------
-    .write_ibd_results <- function(con) {
+    .write_ibd_results <- function(con, t_compute = NULL) {
       r <- ibd_results_r()
       s <- as.data.frame(r$summary, stringsAsFactors = FALSE)
-      writeLines(c("Isolation by Distance - Regression results", ""), con = con, useBytes = TRUE)
+      writeLines(c("Isolation by Distance - Regression results", "", pga_legend("ibd"), ""), con = con, useBytes = TRUE)
       writeLines("Table 1: regression of genetic distance (FST/(1-FST)) on geographic distance. Line = Average (observed pairwise values) and 95%CI-i / 95%CI-s (lines through the lower / upper limits of the pairwise intervals obtained by bootstrap over loci, BS/Loci). b = slope, Nb = 1/b (neighbourhood size), Nem = Nb/(2*pi)", con = con)
       write.table(s, file = con, sep = "\t", row.names = FALSE, quote = FALSE, append = TRUE)
       bi <- r$boot_indiv
@@ -420,8 +420,7 @@ server_isolation_by_distance <- function(id, rv) {
       } else {
         writeLines("Table 2: bootstrap over individuals (BS/Indiv) not available (pairwise table uploaded from a file, or genetic distance column other than FR, FR_raw, FST_raw, FST_ENA, DCSE_raw, DCSE_INA)", con = con)
       }
-      writeLines("", con = con)
-      writeLines(pga_legend("ibd"), con = con)
+      if (!is.null(t_compute)) pga_write_time(con, Sys.time() - as.numeric(t_compute, units = "secs"))
     }
 
     # -- Parameters file: everything about how this run was configured ------
@@ -459,13 +458,14 @@ server_isolation_by_distance <- function(id, rv) {
     output$run_ibd <- downloadHandler(
       filename = function() paste0(ibd_out_root_r(), "IBD-", Sys.Date(), ".zip"),
       content  = function(file) {
+        t0 <- Sys.time()
         r <- .run_ibd_computation()
         ibd_results_store(r)
         tmpdir <- tempfile("pga_ibd_export_"); dir.create(tmpdir)
         on.exit(unlink(tmpdir, recursive = TRUE), add = TRUE)
 
         p1 <- file.path(tmpdir, ibd_out_filename("IBD"))
-        con1 <- file(p1, open = "w", encoding = "UTF-8"); .write_ibd_results(con1); close(con1)
+        con1 <- file(p1, open = "w", encoding = "UTF-8"); .write_ibd_results(con1, t_compute = difftime(Sys.time(), t0, units = "secs")); close(con1)
 
         p2 <- file.path(tmpdir, ibd_out_filename("IBD-parameters"))
         con2 <- file(p2, open = "w", encoding = "UTF-8"); .write_ibd_params(con2); close(con2)
@@ -927,6 +927,7 @@ server_isolation_by_distance <- function(id, rv) {
     output$run_mantel <- downloadHandler(
       filename = function() paste0(mt_out_root_r(), "-Mantel-Res.zip"),
       content  = function(file) {
+        t0 <- Sys.time()
         r <- .run_mantel_computation()
         mantel_results_store(r)
         d <- .mantel_summary_df(r)
@@ -938,6 +939,7 @@ server_isolation_by_distance <- function(id, rv) {
         con <- file(p1, open = "w", encoding = "UTF-8")
         writeLines(c("Mantel test results", sprintf("Permutations: %s", format(r$n_perm))), con = con, useBytes = TRUE)
         write.table(d, file = con, sep = "\t", row.names = FALSE, quote = FALSE, append = TRUE)
+        pga_write_time(con, t0)
         close(con)
 
         zip::zip(zipfile = file, files = basename(p1), root = tmpdir)

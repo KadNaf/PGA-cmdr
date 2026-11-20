@@ -245,7 +245,7 @@ server_LD <- function(id, rv) {
         stringsAsFactors = FALSE
       )
       
-      shinyWidgets::updateProgressBar(session, "LD_progress", value = 100)
+      shinyWidgets::updateProgressBar(session, "LD_progress", value = 90)
       ld_timing(round(difftime(Sys.time(), start_time, units = "secs"), 1))
       
       pv
@@ -306,14 +306,20 @@ server_LD <- function(id, rv) {
     output$run_LD <- downloadHandler(
       filename = function() paste0("LD_", Sys.Date(), ".txt"),
       content  = function(file) {
+        t0 <- Sys.time()
         pv <- .run_ld_computation()
         ld_results_store(pv)
         req(pv)
         con <- file(file, open = "w", encoding = "UTF-8")
-        on.exit(close(con), add = TRUE)
+        con_open <- TRUE
+        on.exit(if (con_open) close(con), add = TRUE)
         .write_ld_params(con, pv)
         writeLines(sprintf("Linkage disequilibrium p-values (all locus pairs), %s permutations; column All = all sub-samples combined", input$n_iterations), con = con)
         write.table(pv, file = con, sep = "\t", row.names = FALSE, quote = FALSE)
+        pga_write_time(con, t0)
+        close(con); con_open <- FALSE
+        pga_progress(session, "LD_progress", 100,
+                     sprintf("Done in %s - file written", pga_fmt_duration(difftime(Sys.time(), t0, units = "secs"))))
       }
     )
   })

@@ -173,16 +173,19 @@ in its name: `_indiv` (individuals resampled within sub-samples; the EM
 algorithm is re-run on every replicate, so this is the slowest step -- the
 replicates run in parallel when the platform allows it), `_subs`
 (sub-samples) and `_loci` (loci). The number of replicates of each is set in
-the tab.
+the tab. The per-locus pairwise half-matrices and the bootstrap distributions
+are **options, unchecked by default** (they take hours and become huge with
+more than 50 loci); the legend is at the top of the files and the computation
+time is written in the run-parameters file.
 
 ### 5. Local panmixia (FIS)
 
 The *Local Panmixia* tab writes **one `.txt` file** with FIS (Weir & Cockerham
 1984) **by locus** and **by population**; both are always computed. A header
 states the number of permutations, the number of replicates and the confidence
-level of the bootstraps (`Confidence level of bootstraps`). The type of every
-interval is given by the suffix of its columns, and a legend under the tables
-spells out every abbreviation:
+level of the bootstraps (`Confidence level of bootstraps`), followed by a legend
+that spells out every abbreviation. The type of every interval is given by the
+suffix of its columns, and the file ends with the computation time:
 
 - `_indiv`: bootstrap over individuals (resampled within each sample);
 - `_subs`: bootstrap over sub-samples (populations resampled as blocks), by
@@ -191,6 +194,10 @@ spells out every abbreviation:
   re-centred by the bias shift (observed - mean of the replicates; Efron &
   Tibshirani 1993). Observed values and permutation tests are not affected;
 - `_loci`: bootstrap over loci, for the Overall row and for each population.
+
+Each interval has its standard error: `SE_indiv`, `SE_subs` (per locus and
+Overall, Tables 3 and 4) and `SE_loci` (per population and Overall, Tables 2
+and 4).
 
 P-values are two-sided permutation p-values. Fewer than 5 sub-samples or
 individuals gives `NA` rather than an unreliable interval. A second output,
@@ -206,22 +213,40 @@ resampled: `CI_L_indiv`/`CI_U_indiv` (BS/Indiv, individuals within
 sub-samples), `CI_L_subs`/`CI_U_subs` (BS/Subs, whole sub-samples) and, on the
 `Overall` row only, `CI_L_loci`/`CI_U_loci` (BS/Loci, loci). Standard errors
 (`SE_indiv`, `SE_subs`, `SE_loci`) and the two-sided permutation p-value
-(`P_value`) come last, and a legend spells out the abbreviations.
+(`P_value`) come last. The legend is at the top of the file, after the
+parameters, and the computation time at the end.
 
 ### 7. Subdivision (FST)
 
-The *Subdivision* tab writes **one `.txt` file**: (1) FST per locus
+The *Subdivision* tab writes **one `.txt` file**. The parameters come first,
+then the legend of the abbreviations, then: (1) FST per locus
 (Weir & Cockerham 1984) and `Overall`, with the three confidence intervals
 (`_indiv`: individuals within sub-samples; `_subs`: sub-samples; `_loci`:
 loci, `Overall` row only), the standard errors and the one-sided permutation
-p-values based on the G statistic (as in FSTAT, `P_value`, `P_theta_gt`,
-`P_theta_lt`); (2) the genotype-reassignment G-test of FSTAT (Goudet et al.
-1996), with its two p-value columns (`p_>=`: permuted G >= observed G; `p_>`:
-permuted G > observed G) and the number of complete multilocus genotypes per
-sample; (3) and (4) pairwise FST between sub-samples. The number of
-permutations of the tab is used for both tests. An option appends the
-bootstrap replicate values at the end of the file so that their distributions
-can be inspected. A legend under the tables spells out the abbreviations.
+p-values (`P_value`, `P_theta_gt`, `P_theta_lt`); (2) the genotype-reassignment
+G-test of FSTAT (Goudet et al. 1996), with its permutation p-value (`P_value`:
+permuted G >= observed G) and the number of complete multilocus genotypes per
+sample. The number of permutations of the tab is used for both tests.
+
+`P_theta_gt` is the proportion of permuted FST values larger than or equal to
+the observed one (test of FST > 0, i.e. structure) and `P_theta_lt` the
+proportion smaller than or equal to it (test of FST < 0). These locus-level
+tests were added to FSTAT by J. Goudet to spot unusual loci; they are rarely
+used, mostly for FIS.
+
+Three **options**, all unchecked by default because they can take hours with
+many loci (more than 50) or many sub-samples:
+
+- *Pairwise FST between sub-samples, multilocus* (Section 3): confidence
+  intervals by BS/Indiv and BS/Loci, G-based p-value. It is the slowest part,
+  because every pair needs its own bootstrap and permutations;
+- *Pairwise FST per locus* (Section 4): one row per pair and locus, so the file
+  becomes very large;
+- *Bootstrap replicate values (detail)* at the end of the file.
+
+The file is written as the results are produced (each pair is written when it
+is computed) and the progress bar shows `Done` only when the file is closed. The
+bar and the end of the file give the **computation time**.
 
 ### 8. Genetic diversities (HS, HT)
 

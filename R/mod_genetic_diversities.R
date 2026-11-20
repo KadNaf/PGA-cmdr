@@ -17,7 +17,7 @@ mod_genetic_diversities_ui <- function(id) {
           column(3,
             h4(icon("sliders"), "Parameters"),
             numericInput(ns("n_boot_fst_div"),    "Number of Bootstrap Replicates:", value = 10000, min = 100, max = 20000, step = 100),
-            checkboxInput(ns("div_detail"), "Add the bootstrap replicate values (detail) at the end of the file", value = TRUE),
+            checkboxInput(ns("div_detail"), "Add the bootstrap replicate values (detail) at the end of the file", value = FALSE),
             uiOutput(ns("ui_div_out_status")),
             downloadButton(ns("run_FST_Analysis_div"), " Run",
                          icon = icon("rocket"),

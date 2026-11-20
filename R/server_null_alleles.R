@@ -1091,8 +1091,12 @@ server_null_alleles <- function(id, rv) {
         dc_pair <- compute_dc_pairwise(em_res)
 
         # 6. Per-locus x pair
-        setProgress(0.45, detail = "Per-locus x pair statistics...")
-        per_locus_pair <- compute_per_locus_pair(em_res)
+        # Optional (unchecked by default): slow and very large with many loci.
+        per_locus_pair <- NULL
+        if (isTRUE(input$per_locus_pairs)) {
+          setProgress(0.45, detail = "Per-locus x pair statistics...")
+          per_locus_pair <- compute_per_locus_pair(em_res)
+        }
 
         # 7. Bootstrap over loci - global FST (vectorised, fast)
         setProgress(0.50, detail = sprintf("Bootstrap over loci \u2014 global FST (%d reps)...", nboot))
@@ -1211,7 +1215,8 @@ server_null_alleles <- function(id, rv) {
           nboot = nboot, nboot_subs = nboot_subs, nboot_indiv = nboot_indiv, alpha = alpha, ci = ci,
           seed = seed,
           treats = treats, markers = markers, pops = pops,
-          em_res = em_res
+          em_res = em_res,
+          opts = list(per_locus_pairs = isTRUE(input$per_locus_pairs), boot_detail = isTRUE(input$boot_detail))
         )
       })
     }
@@ -1266,6 +1271,27 @@ server_null_alleles <- function(id, rv) {
     meta_header <- function(r, file_desc, fst_dcse = TRUE) {
       character(0)
     }
+
+    # Parameters + abbreviations written at the TOP of the main result files.
+    na_head <- function(r, title) {
+      c(title,
+        sprintf("Dataset: %s", rv$dataset_filename %||% "default_dataset"),
+        sprintf("Loci (n = %d): %s", length(r$markers), paste(r$markers, collapse = ", ")),
+        sprintf("Sub-samples (n = %d): %s", length(r$pops), paste(r$pops, collapse = ", ")),
+        sprintf("Bootstrap replicates (over loci): %s", r$nboot),
+        sprintf("Bootstrap replicates (over sub-samples): %s", r$nboot_subs %||% r$nboot),
+        sprintf("Bootstrap replicates (over individuals): %s", r$nboot_indiv %||% "NA"),
+        sprintf("Critical level (alpha): %s", r$alpha),
+        sprintf("Seed: %s", r$seed %||% "NA"),
+        "", pga_legend("null"), "")
+    }
+
+    n_loci_na <- reactive({ length(tryCatch(markers_r(), error = function(e) character(0))) })
+    output$ui_many_loci_warning <- renderUI({
+      w <- pga_many_loci_warning(n_loci_na())
+      if (is.null(w)) return(NULL)
+      tags$p(style = "color:#b35900;font-size:13px;font-weight:600;", icon("triangle-exclamation"), " ", w)
+    })
 
     write_with_header <- function(hdr, df, file, sep = "\t") {
       con <- file(file, open = "w", encoding = "UTF-8")
@@ -1361,7 +1387,7 @@ server_null_alleles <- function(id, rv) {
                      "SE_raw_indiv", "SE_ENA_indiv", "SE_raw_subs", "SE_ENA_subs",
                      "SE_raw_loci", "SE_ENA_loci")
       out <- rbind(glob[, col_order], pl[, col_order])
-      list(header = meta_header(r, "Global FST and FST-ENA with bootstrap CIs"),
+      list(header = na_head(r, "Null alleles - global FST and FST-ENA per locus and overall, with confidence intervals and standard errors"),
            data   = out)
     })
 
@@ -1584,7 +1610,29 @@ server_null_alleles <- function(id, rv) {
       TRUE
     })
 
-    n_files_r <- reactive({ if (isTRUE(include_pairwise_r())) 6L else 5L })
+    n_files_r <- reactive({
+      r <- tryCatch(results_r(), error = function(e) NULL)
+      o <- if (is.null(r)) list(per_locus_pairs = isTRUE(input$per_locus_pairs), boot_detail = isTRUE(input$boot_detail)) else r$opts
+      7L - !isTRUE(o$per_locus_pairs) - !isTRUE(o$boot_detail)
+    })
+    .opt_on <- function(nm) { r <- tryCatch(results_r(), error = function(e) NULL)
+      isTRUE(if (is.null(r)) input[[nm]] else r$opts[[if (nm == "per_locus_pairs") "per_locus_pairs" else "boot_detail"]]) }
+    output$ui_file4_card <- renderUI({
+      if (!.opt_on("per_locus_pairs")) return(NULL)
+      tags$div(class = "pga-module-card na-filecard", style = "margin-bottom:14px; max-width:400px;",
+        h5("Per-locus half-matrices"),
+        p("Paired genetic distances in half left matrices, for use by other software."),
+        tags$div(class = "fname", uiOutput(session$ns("ui_filename_4"), inline = TRUE)),
+        uiOutput(session$ns("ui_dl_file4")))
+    })
+    output$ui_file5_card <- renderUI({
+      if (!.opt_on("boot_detail")) return(NULL)
+      tags$div(class = "pga-module-card na-filecard", style = "margin-bottom:14px; max-width:400px;",
+        h5("Bootstrap distributions"),
+        p("Detailed bootstrap distribution for global FST's."),
+        tags$div(class = "fname", uiOutput(session$ns("ui_filename_5"), inline = TRUE)),
+        uiOutput(session$ns("ui_dl_file5")))
+    })
 
     output$ui_output_files_title <- renderUI({
       div(style = "background-color: #FFFFFF; padding: 10px; color: #333a43; font-weight: 600;",
@@ -1669,7 +1717,7 @@ server_null_alleles <- function(id, rv) {
 
     file7_data <- reactive({
       shiny::req(include_pairwise_r())
-      list(header = meta_header(results_r(), if (isTRUE(gps_available_r())) "Full pairwise table (FST, FST-ENA, DCSE, DCSE-INA, FR, D_geo, ln(D_geo))" else "Full pairwise table (FST, FST-ENA, DCSE, DCSE-INA, FR; no GPS coordinates, so no D_geo)"),
+      list(header = na_head(results_r(), if (isTRUE(gps_available_r())) "Null alleles - full pairwise table (FST, FST-ENA, DCSE, DCSE-INA, FR, D_geo, ln(D_geo))" else "Null alleles - full pairwise table (FST, FST-ENA, DCSE, DCSE-INA, FR; no GPS coordinates, so no D_geo)"),
            data   = .label_pairwise_cols(full_pairwise_r(), results_r()$boot_indiv$pair))
     })
 
@@ -1703,9 +1751,12 @@ server_null_alleles <- function(id, rv) {
     # -- Build every output file into a temp directory; returns the file
     #    paths written. Shared by both the browser-download zip and the
     #    "save to a chosen folder" flow below, so the two never drift apart.
-    .build_export_files <- function(tmpdir) {
+    .build_export_files <- function(tmpdir, t_compute = NULL) {
       d1 <- file1_data(); d2 <- file2_data()
-      d4 <- file4_data(); d5 <- file5_data(); d6 <- file6_data()
+      r0 <- results_r()
+      d4 <- if (isTRUE(r0$opts$per_locus_pairs)) file4_data() else NULL
+      d5 <- if (isTRUE(r0$opts$boot_detail)) file5_data() else NULL
+      d6 <- file6_data()
 
       p1a <- file.path(tmpdir, out_filename("-p_nulls-perLoc&Sbsp"))
       write_with_header(character(0), d1$t1, p1a, sep = "\t")
@@ -1716,23 +1767,32 @@ server_null_alleles <- function(id, rv) {
       p2 <- file.path(tmpdir, out_filename("-global_FST_ENA_CI"))
       write_with_header(d2$header, d2$data, p2, sep = "\t")
 
-      p4 <- file.path(tmpdir, out_filename("-per_locus_half_matrices"))
-      con4 <- file(p4, open = "w", encoding = "UTF-8")
-      writeLines(d4$header, con = con4, useBytes = TRUE)
-      for (loc in d4$markers) {
-        for (sc in c("FST_raw","FST_ENA")) {
-          writeLines(half_matrix_txt(d4$fst_df, sc, d4$pops, loc), con=con4, useBytes=TRUE)
-          writeLines("", con=con4)
+      r_ <- results_r()
+      all_files <- c(p1a, p1b, p2)
+      if (isTRUE(r_$opts$per_locus_pairs) && !is.null(r_$per_locus_pair)) {
+        p4 <- file.path(tmpdir, out_filename("-per_locus_half_matrices"))
+        con4 <- file(p4, open = "w", encoding = "UTF-8")
+        writeLines(d4$header, con = con4, useBytes = TRUE)
+        for (loc in d4$markers) {
+          for (sc in c("FST_raw","FST_ENA")) {
+            writeLines(half_matrix_txt(d4$fst_df, sc, d4$pops, loc), con=con4, useBytes=TRUE)
+            writeLines("", con=con4)
+          }
+          for (sc in c("DCSE_raw","DCSE_INA")) {
+            writeLines(half_matrix_txt(d4$dc_df, sc, d4$pops, loc), con=con4, useBytes=TRUE)
+            writeLines("", con=con4)
+          }
+          flush(con4)   # written locus by locus
         }
-        for (sc in c("DCSE_raw","DCSE_INA")) {
-          writeLines(half_matrix_txt(d4$dc_df, sc, d4$pops, loc), con=con4, useBytes=TRUE)
-          writeLines("", con=con4)
-        }
+        close(con4)
+        all_files <- c(all_files, p4)
       }
-      close(con4)
 
-      p5 <- file.path(tmpdir, out_filename("-bootstrap_distributions"))
-      write_with_header(d5$header, d5$data, p5, sep = "\t")
+      if (isTRUE(r_$opts$boot_detail)) {
+        p5 <- file.path(tmpdir, out_filename("-bootstrap_distributions"))
+        write_with_header(d5$header, d5$data, p5, sep = "\t")
+        all_files <- c(all_files, p5)
+      }
 
       p6 <- file.path(tmpdir, out_filename("-run_parameters"))
       con6 <- file(p6, open = "w", encoding = "UTF-8")
@@ -1743,9 +1803,10 @@ server_null_alleles <- function(id, rv) {
       writeLines("", con = con6)
       writeLines("Missing genotype coding per locus:", con = con6)
       write.table(d6$loci, file = con6, sep = "\t", row.names = FALSE, quote = FALSE)
+      if (!is.null(t_compute)) writeLines(c("", sprintf("Computation time: %s", pga_fmt_duration(t_compute))), con = con6)
       close(con6)
 
-      all_files <- c(p1a, p1b, p2, p4, p5, p6)
+      all_files <- c(all_files, p6)
 
       if (isTRUE(include_pairwise_r())) {
         d7 <- file7_data()
@@ -1764,12 +1825,17 @@ server_null_alleles <- function(id, rv) {
     output$run_all <- downloadHandler(
       filename = function() paste0(out_root_r(), "PGA_null_alleles_export_", Sys.Date(), ".zip"),
       content  = function(file) {
+        t0 <- Sys.time()
         r <- .run_computation()
         results_store(r)
         tmpdir <- tempfile("pga_export_"); dir.create(tmpdir)
         on.exit(unlink(tmpdir, recursive = TRUE), add = TRUE)
-        all_files <- .build_export_files(tmpdir)
+        id <- showNotification("Computation finished - writing the files...", type = "message", duration = NULL)
+        all_files <- .build_export_files(tmpdir, t_compute = difftime(Sys.time(), t0, units = "secs"))
         zip::zip(zipfile = file, files = basename(all_files), root = tmpdir)
+        removeNotification(id)
+        showNotification(sprintf("Done in %s - files written.", pga_fmt_duration(difftime(Sys.time(), t0, units = "secs"))),
+                         type = "message", duration = NULL)
       }
     )
 

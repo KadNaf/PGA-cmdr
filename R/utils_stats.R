@@ -309,7 +309,8 @@ pga_fis_pop_loci_boot <- function(mat, base = 1000L, n_boot = 1000L, conf_level 
   tab <- do.call(rbind, lapply(seq_len(ncol(reps)), function(k) {
     ci <- pga_ci(reps[, k], conf_level)
     data.frame(Population = colnames(reps)[k], Observed_FIS = all_obs[k],
-               CI_L_loci = ci[["lo"]], CI_U_loci = ci[["hi"]], stringsAsFactors = FALSE)
+               CI_L_loci = ci[["lo"]], CI_U_loci = ci[["hi"]],
+               SE_loci = stats::sd(reps[, k], na.rm = TRUE), stringsAsFactors = FALSE)
   }))
   list(table = tab, reps = reps)
 }
@@ -474,7 +475,11 @@ pga_n_abs_ge <- function(null, obs, tol = PGA_TIE_TOL) sum(abs(null) >= abs(obs)
 # ---------------------------------------------------------------------------
 pga_pairwise_fst <- function(mat, base = 1000L, n_boot = 1000L, n_perm = 1000L,
                              conf_level = 0.95, seed = 1, missing_code = 0L,
-                             n_threads = 1L) {
+                             n_threads = 1L, per_locus = TRUE, on_pair = NULL) {
+  # per_locus = FALSE: only the multilocus table (no pair x locus table).
+  # on_pair(k, n_pairs, overall_row, per_locus_block): called after every pair, so that
+  # the caller can write its results to the file as they are produced (the returned
+  # lists are then empty).
   mat <- as.matrix(mat); storage.mode(mat) <- "integer"
   levels <- attr(mat, "pop_levels")
   codes  <- sort(unique(mat[, 1]))
@@ -483,6 +488,7 @@ pga_pairwise_fst <- function(mat, base = 1000L, n_boot = 1000L, n_perm = 1000L,
   loc <- colnames(mat)[-1L]
   if (is.null(loc)) loc <- paste0("L", seq_len(ncol(mat) - 1L))
   ov <- list(); pl <- list(); k <- 0L
+  n_pairs <- length(codes) * (length(codes) - 1L) / 2L
   for (i in seq_len(length(codes) - 1L)) for (j in (i + 1L):length(codes)) {
     if (j > length(codes)) next
     k <- k + 1L
@@ -511,15 +517,23 @@ pga_pairwise_fst <- function(mat, base = 1000L, n_boot = 1000L, n_perm = 1000L,
                           CI_L_indiv = ci_o[["lo"]], CI_U_indiv = ci_o[["hi"]],
                           SE_loci = bl$SE, CI_L_loci = bl$CI_L, CI_U_loci = bl$CI_U,
                           P_value = p_o, stringsAsFactors = FALSE)
-    ci_l <- vapply(seq_along(loc), function(q)
-      pga_ci_bias_shift(obs$FST[q], bi$FST_boot[, q], conf_level), numeric(2))
-    pl[[k]] <- data.frame(Sub_sample_1 = nm(codes[i]), Sub_sample_2 = nm(codes[j]),
-                          Locus = loc, FST = as.numeric(obs$FST),
-                          SE_indiv = apply(bi$FST_boot, 2, stats::sd, na.rm = TRUE),
-                          CI_L_indiv = ci_l[1, ], CI_U_indiv = ci_l[2, ],
-                          P_value = p_l, stringsAsFactors = FALSE)
+    blk <- NULL
+    if (isTRUE(per_locus)) {
+      ci_l <- vapply(seq_along(loc), function(q)
+        pga_ci_bias_shift(obs$FST[q], bi$FST_boot[, q], conf_level), numeric(2))
+      blk <- data.frame(Sub_sample_1 = nm(codes[i]), Sub_sample_2 = nm(codes[j]),
+                        Locus = loc, FST = as.numeric(obs$FST),
+                        SE_indiv = apply(bi$FST_boot, 2, stats::sd, na.rm = TRUE),
+                        CI_L_indiv = ci_l[1, ], CI_U_indiv = ci_l[2, ],
+                        P_value = p_l, stringsAsFactors = FALSE)
+    }
+    if (is.function(on_pair)) {
+      on_pair(k, n_pairs, ov[[k]], blk)
+      ov <- list()   # keep memory flat
+    } else pl[[k]] <- blk
   }
-  list(overall = do.call(rbind, ov), per_locus = do.call(rbind, pl))
+  if (is.function(on_pair)) return(list(overall = NULL, per_locus = NULL))
+  list(overall = do.call(rbind, ov), per_locus = if (isTRUE(per_locus)) do.call(rbind, pl) else NULL)
 }
 
 
@@ -534,7 +548,9 @@ pga_pairwise_fst <- function(mat, base = 1000L, n_boot = 1000L, n_perm = 1000L,
 #   P_value, P_deficit, P_excess.  CI is NA when the sub-sample has < 5 individuals.
 # ---------------------------------------------------------------------------
 pga_fis_locus_pop <- function(mat, base = 1000L, pop_names = NULL, n_boot = 1000L,
-                              n_perm = 1000L, conf_level = 0.95, seed = 1) {
+                              n_perm = 1000L, conf_level = 0.95, seed = 1, on_pop = NULL) {
+  # on_pop(k, n_pops, block): called after every sub-sample so that the caller can write
+  # the rows to the file as they are produced; the function then returns NULL.
   mat <- as.matrix(mat); storage.mode(mat) <- "integer"
   loc <- colnames(mat)[-1L]
   codes <- sort(unique(mat[, 1]))
@@ -577,7 +593,9 @@ pga_fis_locus_pop <- function(mat, base = 1000L, pop_names = NULL, n_boot = 1000
                            FIS = obs, SE = se,
                            CI_L = cl, CI_U = cu, P_value = p2, P_deficit = pd, P_excess = pe,
                            stringsAsFactors = FALSE)
+    if (is.function(on_pop)) { on_pop(k, length(codes), out[[k]]); out[k] <- list(NULL) }
   }
+  if (is.function(on_pop)) return(invisible(NULL))
   do.call(rbind, out)
 }
 
@@ -617,8 +635,8 @@ pga_legend <- function(kind = c("fis", "fit", "fst", "div", "null", "ibd")) {
     FST        = "FST = differentiation among sub-samples (Weir and Cockerham 1984)",
     HS         = "HS = gene diversity within sub-samples (Nei and Chesser 1983)",
     HT         = "HT = total gene diversity (Nei and Chesser 1983)",
-    Overall    = "Overall = multilocus value (ratio of sums over loci)",
-    P_theta    = "P_theta_gt and P_theta_lt = permutation p-values of the FST estimate for the alternatives FST larger and FST smaller than expected under no differentiation",
+    Overall    = "Overall = multilocus value",
+    P_theta    = "P_theta_gt = proportion of permuted FST (theta) values larger than or equal to the observed one (test of FST > 0, i.e. structure); P_theta_lt = proportion smaller than or equal to the observed one (test of FST < 0); locus-level tests introduced by J. Goudet in FSTAT to spot unusual loci",
     FSTENA     = "FST_ENA = FST corrected for null alleles (ENA method, Chapuis and Estoup 2007)",
     FSTraw     = "FST_raw = FST not corrected for null alleles",
     INA        = "INA = individual null allele correction of the genotypes",
@@ -632,4 +650,44 @@ pga_legend <- function(kind = c("fis", "fit", "fst", "div", "null", "ibd")) {
     null = c("ID", "BS_indiv", "BS_subs", "CI", "SE", "P", "FSTENA", "FSTraw", "INA"),
     ibd  = c("ID", "BS_indiv", "BS_loci", "CI", "SE", "P", "FSTENA", "IBD"))
   c("Abbreviations:", unname(d[keys]))
+}
+
+# ---------------------------------------------------------------------------
+# Duration helpers: formatted computation time, written in the output files
+# and shown on the progress bars.
+# ---------------------------------------------------------------------------
+pga_fmt_duration <- function(secs) {
+  secs <- as.numeric(secs)
+  if (!is.finite(secs)) return("NA")
+  if (secs < 60) return(sprintf("%.1f s", secs))
+  h <- secs %/% 3600; m <- (secs - 3600 * h) %/% 60; sec <- round(secs - 3600 * h - 60 * m)
+  if (h > 0) sprintf("%d h %02d min %02d s", as.integer(h), as.integer(m), as.integer(sec))
+  else sprintf("%d min %02d s", as.integer(m), as.integer(sec))
+}
+
+# Writes the final "Computation time" line at the end of an open file connection.
+pga_write_time <- function(con, t0) {
+  writeLines(c("", sprintf("Computation time: %s", pga_fmt_duration(difftime(Sys.time(), t0, units = "secs")))),
+             con = con, useBytes = TRUE)
+}
+
+# updateProgressBar() that never stops a computation if the UI cannot be reached.
+pga_progress <- function(session, id, value, title = NULL) {
+  tryCatch(shinyWidgets::updateProgressBar(session, id, value = value, title = title),
+           error = function(e) invisible(NULL))
+}
+
+# Header block + legend written at the TOP of an output file (after the parameters).
+pga_write_head <- function(con, hdr, kind) {
+  writeLines(hdr, con = con, useBytes = TRUE)
+  writeLines(c(pga_legend(kind), ""), con = con, useBytes = TRUE)
+}
+
+# Number of loci above which the slow, per-pair/per-locus outputs are discouraged.
+PGA_MANY_LOCI <- 50L
+pga_many_loci_warning <- function(n_loci) {
+  if (is.finite(n_loci) && n_loci > PGA_MANY_LOCI)
+    sprintf("With more than %d loci (here %d), the pairwise and per-locus calculations and, above all, the writing of the output file can take hours. Leave these options unchecked unless you really need them.",
+            PGA_MANY_LOCI, as.integer(n_loci))
+  else NULL
 }

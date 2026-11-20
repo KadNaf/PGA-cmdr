@@ -700,6 +700,7 @@ server_general_stats <- function(id, rv) {
       # the sampling of populations, not just individuals within populations.
       # This is the same resampling scheme used for FST.
       n_subs_avail_fis <- length(unique(mat[, 1]))
+      boot_pop_mat <- NULL
       if (n_subs_avail_fis < 5L) {
         # Fewer than 5 sub-samples (populations): bootstrap over sub-samples
         # is not meaningful - report NA instead of computing.
@@ -883,7 +884,7 @@ server_general_stats <- function(id, rv) {
                                         n_boot = input$n_boot, conf_level = input$conf_level, seed = .seed())
         pop_loci_boot <- pga_fis_pop_loci_boot(mat_fis, base_fis, input$n_boot, input$conf_level, seed = .seed())
 
-        shinyWidgets::updateProgressBar(session, "fis_progress", value = 100)
+        pga_progress(session, "fis_progress", 70, "Bootstrap finished - per locus x sub-sample table and file writing in progress...")
 
         fis_boot_timing(round(difftime(Sys.time(), start_time, units = "secs"), 1))
         # The on-screen value boxes stay driven by the by-locus view.
@@ -939,7 +940,7 @@ server_general_stats <- function(id, rv) {
         sprintf("Seed: %s", .seed()),
         ""
       )
-      writeLines(hdr, con = con, useBytes = TRUE)
+      pga_write_head(con, hdr, "fis")
     }
 
     # By-locus table: bootstrap over individuals and over sub-samples for every locus,
@@ -970,6 +971,12 @@ server_general_stats <- function(id, rv) {
         CI_U_subs    = pick(r$ci_pop$ci_hi, r$ci_pop$overall_ci_hi),
         CI_L_loci    = cl,
         CI_U_loci    = ch,
+        SE_subs      = {
+          # bootstrap over sub-samples: one column per locus and a last "Overall" column
+          se <- if (!is.null(r$bootstrap_pop_results)) apply(r$bootstrap_pop_results, 2, stats::sd, na.rm = TRUE) else NULL
+          if (length(se) == n) as.numeric(se) else rep(NA_real_, n)
+        },
+        SE_loci      = { v <- rep(NA_real_, n); if (nrow(lb) == 1L && "SE" %in% names(lb)) v[n] <- lb$SE; v },
         P_value      = ft$P_value,
         stringsAsFactors = FALSE
       )
@@ -992,6 +999,7 @@ server_general_stats <- function(id, rv) {
         CI_U_indiv   = ft$CI_U,
         CI_L_loci    = pl$CI_L_loci[m],
         CI_U_loci    = pl$CI_U_loci[m],
+        SE_loci      = pl$SE_loci[m],
         P_value      = ft$P_value,
         stringsAsFactors = FALSE
       )
@@ -1004,6 +1012,7 @@ server_general_stats <- function(id, rv) {
       out$CI_U_indiv[n]   <- ov$CI_U_indiv
       out$CI_L_loci[n]    <- ov$CI_L_loci
       out$CI_U_loci[n]    <- ov$CI_U_loci
+      out$SE_loci[n]      <- ov$SE_loci
       out$P_value[n]      <- ov$P_value
       out
     }
@@ -1013,16 +1022,19 @@ server_general_stats <- function(id, rv) {
     #    content() function and everything (methods block + By Locus +
     #    By Population) is written to ONE plain .txt file (no zip, no figure).
     output$ui_fis_out_status <- renderUI({
-      tags$p(style = "color:#555;font-size:14px;margin-top:6px;",
-        "The results will be saved in ", tags$code(paste0("local_panmixia_FIS_", Sys.Date(), ".txt")), ".")
+      w <- pga_many_loci_warning(tryCatch(n_loci_db_r(), error = function(e) NA_real_))
+      tagList(
+        tags$p(style = "color:#555;font-size:14px;margin-top:6px;",
+          "The results will be saved in ", tags$code(paste0("local_panmixia_FIS_", Sys.Date(), ".txt")), "."),
+        if (!is.null(w)) tags$p(style = "color:#b35900;font-size:13px;font-weight:600;", icon("triangle-exclamation"), " ", w))
     })
 
     output$Run_FIS_Analysis <- downloadHandler(
       filename = function() paste0("local_panmixia_FIS_", Sys.Date(), ".txt"),
       content  = function(file) {
+        t0 <- Sys.time()
         res <- .run_fis_computation()
         req(res)
-        # Table 1: FIS per locus x sub-sample (CI, p-values)
         mat_lp <- as.matrix(hf_mat_r()); storage.mode(mat_lp) <- "integer"
         pn <- tryCatch({
           pd <- DBI::dbGetQuery(con_r(), sprintf(
@@ -1030,28 +1042,41 @@ server_general_stats <- function(id, rv) {
             sql_ident(con_r(), tbl_meta_r())))
           as.character(pd$Population)[seq_along(sort(unique(mat_lp[, 1])))]
         }, error = function(e) NULL)
-        lp <- pga_fis_locus_pop(mat_lp, base = base_r(), pop_names = pn, n_boot = input$n_boot,
-                                n_perm = input$n_perm, conf_level = input$conf_level, seed = .seed())
-        nb <- input$n_boot; npm <- input$n_perm
+        # The file is written as the results are produced (header and legend first,
+        # then every table, then the computation time) and is closed before "Done".
         con <- file(file, open = "w", encoding = "UTF-8")
-        on.exit(close(con), add = TRUE)
+        con_open <- TRUE
+        on.exit(if (con_open) close(con), add = TRUE)
         .write_fis_params(con, res)
         lo <- .fis_locus_export(res)
         wt <- function(x) pga_write_table(x, file = con)
+        # Table 1: written sub-sample by sub-sample
         writeLines("Table 1: FIS per locus and sub-sample, confidence intervals (BS over individuals) (CI_L and CI_U), Standard error of FIS (SE) and p-values for panmixia.", con = con)
-        wt(lp)
+        first <- TRUE
+        pga_fis_locus_pop(mat_lp, base = base_r(), pop_names = pn, n_boot = input$n_boot,
+                          n_perm = input$n_perm, conf_level = input$conf_level, seed = .seed(),
+                          on_pop = function(k, n, df) {
+                            utils::write.table(pga_se_p_last(df), file = con, sep = "\t", row.names = FALSE,
+                                               quote = FALSE, col.names = first)
+                            first <<- FALSE
+                            flush(con)
+                            pga_progress(session, "fis_progress", 70 + round(28 * k / n),
+                                         sprintf("Writing Table 1: sub-sample %d / %d", k, n))
+                          })
         writeLines("", con = con)
         writeLines("Table 2: FIS per sub-sample over all loci, confidence intervals by bootstrap over individuals (BS/Indiv) and over loci (BS/Loci), standard errors (SE) and p-values (P_value)", con = con)
         wt(.fis_pop_export(res))
         writeLines("", con = con)
         writeLines("Table 3: FIS per locus over all sub-samples, confidence intervals by bootstrap over individuals (BS/Indiv) and over sub-samples (BS/Subs), standard errors (SE) and p-values (P_value)", con = con)
-        wt(lo[-nrow(lo), setdiff(names(lo), c("CI_L_loci", "CI_U_loci")), drop = FALSE])
+        wt(lo[-nrow(lo), setdiff(names(lo), c("CI_L_loci", "CI_U_loci", "SE_loci")), drop = FALSE])
         writeLines("", con = con)
         writeLines("Table 4: FIS over all sub-samples and loci, confidence intervals by BS/Indiv, BS/Subs and BS/Loci, standard errors (SE) and p-value (P_value)", con = con)
         ov <- lo[nrow(lo), , drop = FALSE]; ov$ID <- "All sub-samples and loci"
         wt(ov)
-        writeLines("", con = con)
-        writeLines(pga_legend("fis"), con = con)
+        pga_write_time(con, t0)
+        close(con); con_open <- FALSE
+        pga_progress(session, "fis_progress", 100,
+                     sprintf("Done in %s - file written", pga_fmt_duration(difftime(Sys.time(), t0, units = "secs"))))
       }
     )
 
@@ -1304,7 +1329,7 @@ server_general_stats <- function(id, rv) {
           cpp_verbose    = FALSE
         )
         
-        shinyWidgets::updateProgressBar(session, "fit_progress", value = 100)
+        pga_progress(session, "fit_progress", 90, "Computation finished - writing the file...")
         
         fit_boot_timing(round(difftime(Sys.time(), start_time, units = "secs"), 1))
         fit_boot_results(results)
@@ -1343,7 +1368,7 @@ server_general_stats <- function(id, rv) {
         sprintf("Seed: %s", .seed()),
         ""
       )
-      writeLines(hdr, con = con, useBytes = TRUE)
+      pga_write_head(con, hdr, "fit")
     }
 
     # -- One button, one click, one action: clicking "Run" IS the download
@@ -1358,6 +1383,7 @@ server_general_stats <- function(id, rv) {
     output$Run_FIT_Analysis <- downloadHandler(
       filename = function() paste0("global_panmixia_FIT_", Sys.Date(), ".txt"),
       content  = function(file) {
+        t0 <- Sys.time()
         res <- .run_fit_computation()
         req(res)
         ft <- res$final_table
@@ -1396,12 +1422,15 @@ server_general_stats <- function(id, rv) {
         out$SE_loci[n]   <- if ("SE" %in% names(bl)) bl$SE else NA_real_
 
         con <- file(file, open = "w", encoding = "UTF-8")
-        on.exit(close(con), add = TRUE)
+        con_open <- TRUE
+        on.exit(if (con_open) close(con), add = TRUE)
         .write_fit_params(con, res)
         writeLines("FIT per locus and overall, confidence intervals (CI_L and CI_U) by bootstrap over individuals (BS/Indiv), over sub-samples (BS/Subs) and over loci (BS/Loci), standard errors (SE) of the bootstraps and p-value (P_value) of the test of global panmixia", con = con)
         pga_write_table(out, file = con)
-        writeLines("", con = con)
-        writeLines(pga_legend("fit"), con = con)
+        pga_write_time(con, t0)
+        close(con); con_open <- FALSE
+        pga_progress(session, "fit_progress", 100,
+                     sprintf("Done in %s - file written", pga_fmt_duration(difftime(Sys.time(), t0, units = "secs"))))
       }
     )
 
@@ -2082,8 +2111,8 @@ server_general_stats <- function(id, rv) {
           diversity_extras = FALSE      # HS-by-individuals / HS-per-population: Diversities only
         )
         
-        shinyWidgets::updateProgressBar(session, "fst_progress", value = 100,
-                                         title = "Done")
+        pga_progress(session, "fst_progress", 60,
+                     "Bootstrap and permutations finished - G-test, pairwise FST and file writing in progress...")
         
         duration <- round(as.numeric(difftime(Sys.time(), start_time, units = "secs")), 1)
         fst_boot_timing(duration)
@@ -2129,8 +2158,7 @@ server_general_stats <- function(id, rv) {
           progress_id    = "fst_progress_div"
         )
 
-        shinyWidgets::updateProgressBar(session, "fst_progress_div", value = 100,
-                                         title = "Done")
+        pga_progress(session, "fst_progress_div", 90, "Computation finished - writing the file...")
 
         duration <- round(as.numeric(difftime(Sys.time(), start_time, units = "secs")), 1)
         div_boot_timing(duration)
@@ -2157,6 +2185,14 @@ server_general_stats <- function(id, rv) {
 
 
 
+    # Number of loci of the imported data (for the "many loci" warning).
+    n_loci_db_r <- reactive({
+      db_ready()
+      tryCatch(as.numeric(DBI::dbGetQuery(con_r(), sprintf("SELECT COUNT(DISTINCT locus_id) AS n FROM %s",
+                                                          sql_ident(con_r(), tbl_hf_r())))$n[[1]]),
+               error = function(e) NA_real_)
+    })
+
     # -- Methods block written at the TOP of the single Subdivision output file.
     .write_fst_params <- function(con, res, gres) {
       md <- if (is.list(res)) res$metadata else NULL
@@ -2176,10 +2212,13 @@ server_general_stats <- function(id, rv) {
         sprintf("Seed: %s", .seed()),
         if (!is.null(nc)) sprintf("Complete multilocus genotypes per sample: %s; total = %d",
                                    paste(sprintf("%s = %d", names(nc), nc), collapse = ", "), sum(nc)),
+        sprintf("Pairwise FST between sub-samples (Section 3): %s", if (isTRUE(input$fst_pairs)) "yes" else "no"),
+        sprintf("Pairwise FST per locus (Section 4): %s", if (isTRUE(input$fst_pairs_loci)) "yes" else "no"),
+        sprintf("Bootstrap replicate values (detail): %s", if (isTRUE(input$fst_detail)) "yes" else "no"),
         ""
       )
       hdr <- hdr[!vapply(hdr, is.null, logical(1))]
-      writeLines(hdr, con = con, useBytes = TRUE)
+      pga_write_head(con, hdr, "fst")
     }
 
     # -- One button, one click, one action: clicking "Run" IS the download
@@ -2192,52 +2231,88 @@ server_general_stats <- function(id, rv) {
     #    value boxes only; Genetic Diversities has its own separate
     #    div_boot_results()/div_boot_timing().
     output$ui_fst_out_status <- renderUI({
-      tags$p(style = "color:#555;font-size:14px;margin-top:6px;",
-        "The results will be saved in ", tags$code(paste0("subdivision_FST_", Sys.Date(), ".txt")), ".")
+      w <- pga_many_loci_warning(tryCatch(n_loci_db_r(), error = function(e) NA_real_))
+      tagList(
+        tags$p(style = "color:#555;font-size:14px;margin-top:6px;",
+          "The results will be saved in ", tags$code(paste0("subdivision_FST_", Sys.Date(), ".txt")), "."),
+        if (!is.null(w)) tags$p(style = "color:#b35900;font-size:13px;font-weight:600;", icon("triangle-exclamation"), " ", w))
     })
 
     output$run_FST_Analysis <- downloadHandler(
       filename = function() paste0("subdivision_FST_", Sys.Date(), ".txt"),
       content  = function(file) {
+        t0 <- Sys.time()
         res <- .run_subdivision_fst_computation()
         req(res)
         # G-based test: same number of permutations as the FST test.
         gres <- .run_g_test_computation(n_perm = input$n_perm_fst)
         nb   <- res$metadata$n_bootstrap
         npm  <- res$metadata$n_permutations
+        want_pairs <- isTRUE(input$fst_pairs) || isTRUE(input$fst_pairs_loci)
+        n_loci <- tryCatch(n_loci_db_r(), error = function(e) NA_real_)
+        if (isTRUE(input$fst_pairs_loci) && is.finite(n_loci) && n_loci > PGA_MANY_LOCI)
+          showNotification(pga_many_loci_warning(n_loci), type = "warning", duration = 20)
 
+        # The file is written as the results are produced and is closed BEFORE "Done".
         con <- file(file, open = "w", encoding = "UTF-8")
-        on.exit(close(con), add = TRUE)
+        con_open <- TRUE
+        on.exit(if (con_open) close(con), add = TRUE)
         .write_fst_params(con, res, gres)
 
         writeLines("Section 1: FST per locus and overall, confidence intervals (CI_L and CI_U) by bootstrap over individuals (BS/Indiv), over sub-samples (BS/Subs) and over loci (BS/Loci), standard errors (SE) and permutation p-values", con = con)
         pga_write_table(pga_fst_section(res$final_table, res$locus_boot_table), file = con)
         writeLines("", con = con)
+        flush(con)
 
         if (is.list(gres)) {
-          gt <- gres$final_table[, c("ID", "G_obs", "p_ge", "p_gt")]
-          names(gt) <- c("ID", "G_obs", "p_>=", "p_>")
-          writeLines("Section 2: G-based test of subdivision (multilocus genotypes), G statistic (G_obs) and permutation p-values (p_>= : proportion of permuted G larger than or equal to G_obs; p_> : strictly larger)", con = con)
+          gt <- gres$final_table[, c("ID", "G_obs", "p_ge")]
+          names(gt) <- c("ID", "G_obs", "P_value")
+          writeLines("Section 2: G-based test of subdivision (multilocus genotypes), G statistic (G_obs) and permutation p-value (P_value: proportion of permuted G larger than or equal to G_obs)", con = con)
           pga_write_table(gt, file = con)
         } else {
           writeLines("Section 2: G-based test not computed", con = con)
         }
+        writeLines("", con = con)
+        flush(con)
 
-        # Pairwise FST between sub-samples: no GPS needed, always produced.
-        pw <- tryCatch(pga_pairwise_fst(hf_mat_r(), base = base_r(), n_boot = nb,
-                                        n_perm = npm, conf_level = input$conf_level_fst,
-                                        seed = .seed(), n_threads = .n_threads()),
-                       error = function(e) { showNotification(paste("Pairwise FST failed:", conditionMessage(e)), type = "warning"); NULL })
-        writeLines("", con = con)
-        if (!is.null(pw)) {
-          writeLines("Section 3: pairwise FST between sub-samples (multilocus), N1 and N2 = numbers of individuals of the two sub-samples, confidence intervals by BS/Indiv and BS/Loci, standard errors (SE) and G-based permutation p-value", con = con)
-          pga_write_table(pw$overall, file = con)
+        if (want_pairs) {
+          # Pairwise FST between sub-samples: each pair is written as soon as it is computed.
+          # Section 3 goes straight to the file; Section 4 (pair x locus, the large one) goes to a
+          # scratch file that is appended after Section 3 at the end.
+          tmp4 <- NULL; con4 <- NULL
+          if (isTRUE(input$fst_pairs_loci)) { tmp4 <- tempfile("pga_sec4_"); con4 <- file(tmp4, open = "w", encoding = "UTF-8") }
+          on.exit({ if (!is.null(con4) && isOpen(con4)) close(con4); if (!is.null(tmp4)) unlink(tmp4) }, add = TRUE)
+          first3 <- TRUE; first4 <- TRUE
+          if (isTRUE(input$fst_pairs))
+            writeLines("Section 3: pairwise FST between sub-samples (multilocus), N1 and N2 = numbers of individuals of the two sub-samples, confidence intervals by BS/Indiv and BS/Loci, standard errors (SE) and G-based permutation p-value", con = con)
+          pw <- tryCatch(
+            pga_pairwise_fst(hf_mat_r(), base = base_r(), n_boot = nb, n_perm = npm,
+                             conf_level = input$conf_level_fst, seed = .seed(), n_threads = .n_threads(),
+                             per_locus = isTRUE(input$fst_pairs_loci),
+                             on_pair = function(k, n, ov_row, blk) {
+                               if (isTRUE(input$fst_pairs)) {
+                                 utils::write.table(pga_se_p_last(ov_row), file = con, sep = "\t", row.names = FALSE,
+                                                    quote = FALSE, col.names = first3)
+                                 first3 <<- FALSE; flush(con)
+                               }
+                               if (!is.null(con4) && !is.null(blk)) {
+                                 utils::write.table(pga_se_p_last(blk), file = con4, sep = "\t", row.names = FALSE,
+                                                    quote = FALSE, col.names = first4)
+                                 first4 <<- FALSE; flush(con4)
+                               }
+                               pga_progress(session, "fst_progress", 60 + round(38 * k / n),
+                                            sprintf("Pairwise FST: pair %d / %d written", k, n))
+                             }),
+            error = function(e) { showNotification(paste("Pairwise FST failed:", conditionMessage(e)), type = "warning"); NULL })
           writeLines("", con = con)
-          writeLines("Section 4: pairwise FST between sub-samples, per locus, confidence intervals and standard errors by BS/Indiv, G-based permutation p-values", con = con)
-          pga_write_table(pw$per_locus, file = con)
+          if (!is.null(con4)) {
+            close(con4)
+            writeLines("Section 4: pairwise FST between sub-samples, per locus, confidence intervals and standard errors by BS/Indiv, G-based permutation p-values", con = con)
+            cin <- file(tmp4, open = "r", encoding = "UTF-8")
+            repeat { ln <- readLines(cin, n = 50000L); if (!length(ln)) break; writeLines(ln, con = con, useBytes = TRUE) }
+            close(cin)
+          }
         }
-        writeLines("", con = con)
-        writeLines(pga_legend("fst"), con = con)
 
         if (isTRUE(input$fst_detail)) {
           writeLines("", con = con)
@@ -2246,6 +2321,10 @@ server_general_stats <- function(id, rv) {
           pga_write_replicates(con, "Detail A: FST, bootstrap over individuals", res$boot_detail$fst_subs)
           pga_write_replicates(con, "Detail B: multilocus FST, bootstrap over loci", res$boot_detail$loci[, "FST", drop = FALSE])
         }
+        pga_write_time(con, t0)
+        close(con); con_open <- FALSE
+        pga_progress(session, "fst_progress", 100,
+                     sprintf("Done in %s - file written", pga_fmt_duration(difftime(Sys.time(), t0, units = "secs"))))
       }
     )
 
@@ -2254,8 +2333,6 @@ server_general_stats <- function(id, rv) {
 
 
 
-    
-    
     ## ===== Diversities tab value boxes (global_fst, global_hs, global_ht, time) =====
 
 
@@ -2290,9 +2367,10 @@ server_general_stats <- function(id, rv) {
         sprintf("Bootstrap replicates: %s", nb),
         sprintf("Confidence level of bootstraps: %s", md$conf_level %||% 0.95),
         sprintf("Seed: %s", .seed()),
+        sprintf("Bootstrap replicate values (detail): %s", if (isTRUE(input$div_detail)) "yes" else "no"),
         ""
       )
-      writeLines(hdr, con = con, useBytes = TRUE)
+      pga_write_head(con, hdr, "div")
     }
 
     # Writes one titled section: a title line, then the table (no `append`
@@ -2316,12 +2394,14 @@ server_general_stats <- function(id, rv) {
     output$run_FST_Analysis_div <- downloadHandler(
       filename = function() paste0("Diversities_confidence_intervals_", Sys.Date(), ".txt"),
       content  = function(file) {
+        t0 <- Sys.time()
         res <- .run_diversities_computation()
         req(res)
         nb <- res$metadata$n_bootstrap
 
         con <- file(file, open = "w", encoding = "UTF-8")
-        on.exit(close(con), add = TRUE)
+        con_open <- TRUE
+        on.exit(if (con_open) close(con), add = TRUE)
         .write_div_params(con, res)
         .write_div_section(con, "Section 1: HS (gene diversity within sub-samples) per locus and overall, confidence intervals (CI_L and CI_U) and standard errors (SE) by bootstrap over individuals (BS/Indiv)",
                            pga_diversity_section(res$hs_indiv_tbl, "Observed_HS", "indiv"))
@@ -2333,8 +2413,6 @@ server_general_stats <- function(id, rv) {
                            pga_diversity_section(res$ht_table, "Observed_HT"))
         .write_div_section(con, "Section 5: HS and HT (multilocus), confidence intervals and standard errors by BS/Indiv, BS/Subs and BS/Loci",
                            pga_multilocus_section(res$locus_boot_table, res$subs_overall, stats = c("HS", "HT")))
-        writeLines(pga_legend("div"), con = con)
-        writeLines("", con = con)
 
         if (isTRUE(input$div_detail)) {
           writeLines("DETAIL: bootstrap replicate values", con = con)
@@ -2347,6 +2425,10 @@ server_general_stats <- function(id, rv) {
           pga_write_replicates(con, "Detail E: HT per locus, bootstrap over individuals", bd$ht_subs)
           pga_write_replicates(con, "Detail F: multilocus HS and HT, bootstrap over loci", bd$loci[, c("HS", "HT"), drop = FALSE])
         }
+        pga_write_time(con, t0)
+        close(con); con_open <- FALSE
+        pga_progress(session, "fst_progress_div", 100,
+                     sprintf("Done in %s - file written", pga_fmt_duration(difftime(Sys.time(), t0, units = "secs"))))
       }
     )
 

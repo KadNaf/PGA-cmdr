@@ -164,3 +164,49 @@ test_that("sub-sample bootstrap is reproducible: same result whatever the number
   expect_equal(a$FIT_boot, b$FIT_boot, tolerance = 1e-12)  # same RNG stream; only FP summation order may differ across threads
   expect_identical(b$FIT_boot, c$FIT_boot)
 })
+
+test_that("legend: Overall has no parenthesis, P_theta_gt / P_theta_lt are explained, no p_>", {
+  for (k in c("fis", "fit", "fst", "div")) {
+    l <- pga_legend(k)
+    expect_true("Overall = multilocus value" %in% l)
+    expect_false(any(grepl("ratio of sums", l)))
+    expect_false(any(grepl("p_>", l, fixed = TRUE)))
+  }
+  l <- pga_legend("fst")
+  expect_true(any(grepl("^P_theta_gt = ", l)) && any(grepl("P_theta_lt = ", l)))
+})
+
+test_that("pga_pairwise_fst: callback and per_locus option give the same numbers", {
+  mat <- default_matrix()
+  keep <- mat[, 1] %in% sort(unique(mat[, 1]))[1:3]
+  m <- mat[keep, , drop = FALSE]; attr(m, "pop_levels") <- attr(mat, "pop_levels")
+  full <- pga_pairwise_fst(m, base = 1000L, n_boot = 50L, n_perm = 50L, seed = 3, n_threads = 1L)
+  r3 <- list(); r4 <- list()
+  cb <- pga_pairwise_fst(m, base = 1000L, n_boot = 50L, n_perm = 50L, seed = 3, n_threads = 1L,
+                         on_pair = function(k, n, o, b) { r3[[k]] <<- o; r4[[k]] <<- b })
+  expect_null(cb$overall)
+  expect_equal(do.call(rbind, r3), full$overall, check.attributes = FALSE)
+  expect_equal(do.call(rbind, r4), full$per_locus, check.attributes = FALSE)
+  nopl <- pga_pairwise_fst(m, base = 1000L, n_boot = 50L, n_perm = 50L, seed = 3, n_threads = 1L, per_locus = FALSE)
+  expect_null(nopl$per_locus)
+  expect_equal(nopl$overall, full$overall)
+})
+
+test_that("pga_fis_locus_pop writes sub-sample by sub-sample, and BS/Loci FIS has an SE", {
+  mat <- default_matrix()
+  full <- pga_fis_locus_pop(mat, base = 1000L, n_boot = 30L, n_perm = 30L, seed = 2)
+  got <- list()
+  expect_null(pga_fis_locus_pop(mat, base = 1000L, n_boot = 30L, n_perm = 30L, seed = 2,
+                                on_pop = function(k, n, d) got[[k]] <<- d))
+  expect_equal(do.call(rbind, got), full, check.attributes = FALSE)
+  pl <- pga_fis_pop_loci_boot(mat, 1000L, 100L, 0.95, 1)
+  expect_true("SE_loci" %in% names(pl$table))
+  expect_true(all(is.finite(pl$table$SE_loci)))
+})
+
+test_that("duration formatting and many-loci warning", {
+  expect_equal(pga_fmt_duration(3.21), "3.2 s")
+  expect_equal(pga_fmt_duration(125), "2 min 05 s")
+  expect_equal(pga_fmt_duration(7384), "2 h 03 min 04 s")
+  expect_null(pga_many_loci_warning(50)); expect_match(pga_many_loci_warning(51), "hours")
+})

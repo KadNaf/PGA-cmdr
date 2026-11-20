@@ -123,6 +123,15 @@ null_alleles_UI <- function(id) {
 
         tags$hr(),
 
+        h4(icon("list-check"), "Optional outputs"),
+        checkboxInput(ns("per_locus_pairs"),
+          "Per-locus pairwise FST/DCSE (half-matrices file; slow and very large with many loci)", value = FALSE),
+        checkboxInput(ns("boot_detail"),
+          "Bootstrap distributions (file with all replicate values)", value = FALSE),
+        uiOutput(ns("ui_many_loci_warning")),
+
+        tags$hr(),
+
         h4(icon("save"), "Choose a name for the output"),
         tags$div(style = "max-width:320px;",
           textInput(ns("out_root"), NULL, value = "", placeholder = "auto-filled from the imported data file name")),
@@ -166,18 +175,8 @@ null_alleles_UI <- function(id) {
           tags$div(class = "fname", uiOutput(ns("ui_filename_2"), inline = TRUE)),
           uiOutput(ns("ui_dl_file2"))
         ),
-        tags$div(class = "pga-module-card na-filecard", style = "margin-bottom:14px; max-width:400px;",
-          h5("Per-locus half-matrices"),
-          p("Paired genetic distances in half left matrices, for use by other software."),
-          tags$div(class = "fname", uiOutput(ns("ui_filename_4"), inline = TRUE)),
-          uiOutput(ns("ui_dl_file4"))
-        ),
-        tags$div(class = "pga-module-card na-filecard", style = "margin-bottom:14px; max-width:400px;",
-          h5("Bootstrap distributions"),
-          p("Detailed bootstrap distribution for global FST's."),
-          tags$div(class = "fname", uiOutput(ns("ui_filename_5"), inline = TRUE)),
-          uiOutput(ns("ui_dl_file5"))
-        ),
+        uiOutput(ns("ui_file4_card")),
+        uiOutput(ns("ui_file5_card")),
         tags$div(class = "pga-module-card na-filecard", style = "margin-bottom:14px; max-width:400px;",
           h5("Run parameters"),
           p("List of parameters you chose to use."),
