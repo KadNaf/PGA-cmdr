@@ -291,7 +291,7 @@ server_LD <- function(id, rv) {
         sprintf("Permutations: %d", np),
         sprintf("Seed: %s", rv$seed %||% 1L)
       )
-      writeLines(c(hdr, ""), con = con, useBytes = TRUE)
+      writeLines(c(hdr, "", pga_refs("ld"), ""), con = con, useBytes = TRUE)
     }
 
     # One button, one click, one action: clicking "Run" IS the download

@@ -413,7 +413,7 @@ server_isolation_by_distance <- function(id, rv) {
     .write_ibd_results <- function(con, t_compute = NULL) {
       r <- ibd_results_r()
       s <- as.data.frame(r$summary, stringsAsFactors = FALSE)
-      writeLines(c("Isolation by Distance - Regression results", "", pga_legend("ibd"), ""), con = con, useBytes = TRUE)
+      writeLines(c("Isolation by Distance - Regression results", "", pga_refs("ibd"), "", pga_legend("ibd"), ""), con = con, useBytes = TRUE)
       writeLines("Table 1: regression of genetic distance (FST/(1-FST)) on geographic distance. Line = Average (observed pairwise values) and 95%CI-i / 95%CI-s (lines through the lower / upper limits of the pairwise intervals obtained by bootstrap over loci, BS/Loci). b = slope, Nb = 1/b (neighbourhood size), Nem = Nb/(2*pi)", con = con)
       write.table(s, file = con, sep = "\t", row.names = FALSE, quote = FALSE)
       bi <- r$boot_indiv

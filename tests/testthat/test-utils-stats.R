@@ -11,7 +11,7 @@ default_matrix <- function() {
   testthat::skip_if_not(file.exists(f), "default dataset not available")
   d <- utils::read.delim(f, check.names = FALSE, stringsAsFactors = FALSE)
   loci <- c("B12", "C07", "D12", "D10", "A12", "C03")
-  a <- as.matrix(d[, 9:20]); mode(a) <- "numeric"
+  a <- as.matrix(d[, 11:22]); mode(a) <- "numeric"
   g <- sapply(seq_along(loci), function(j) {
     x <- a[, 2 * j - 1]; y <- a[, 2 * j]
     ifelse(x > 0 & y > 0, x * 1000L + y, 0L)

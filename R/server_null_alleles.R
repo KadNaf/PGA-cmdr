@@ -1193,7 +1193,6 @@ server_null_alleles <- function(id, rv) {
             N_tot          = n_tot,
             N_blanks       = n_blanks,
             f_expBlanks    = round(f_exp, 6),
-            p_nulls        = round(av_p, 6),
             p_value        = pval,
             stringsAsFactors=FALSE)
         })
@@ -1283,7 +1282,7 @@ server_null_alleles <- function(id, rv) {
         sprintf("Bootstrap replicates (over individuals): %s", r$nboot_indiv %||% "NA"),
         sprintf("Critical level (alpha): %s", r$alpha),
         sprintf("Seed: %s", r$seed %||% "NA"),
-        "", pga_legend("null"), "")
+        "", pga_refs("null"), "", pga_legend("null"), "")
     }
 
     n_loci_na <- reactive({ length(tryCatch(markers_r(), error = function(e) character(0))) })
@@ -1800,6 +1799,8 @@ server_null_alleles <- function(id, rv) {
       writeLines("General parameters:", con = con6)
       # No "Parameter / Value" header line: the two columns are self-explanatory.
       write.table(d6$params, file = con6, sep = "\t", row.names = FALSE, col.names = FALSE, quote = FALSE)
+      writeLines("", con = con6)
+      writeLines(c("", pga_refs("null")), con = con6, useBytes = TRUE)
       writeLines("", con = con6)
       writeLines("Missing genotype coding per locus:", con = con6)
       write.table(d6$loci, file = con6, sep = "\t", row.names = FALSE, quote = FALSE)

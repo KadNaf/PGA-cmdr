@@ -640,6 +640,7 @@ pga_legend <- function(kind = c("fis", "fit", "fst", "div", "null", "ibd")) {
     CI_na      = "CI_lo and CI_hi = lower and upper limits of the confidence interval; suffixes _indiv, _subs and _loci give the bootstrap used",
     FSTENA     = "FST_ENA = FST corrected for null alleles (ENA method, Chapuis and Estoup 2007)",
     FSTraw     = "FST_raw = FST not corrected for null alleles",
+    PN         = "p_nulls = null allele frequency (EM); Av_p_nulls = mean of p_nulls over sub-samples weighted by N; N = individuals (typed + missing); N_blanks = missing genotypes; N_exp_blanks = N x p_nulls^2 (expected null homozygotes); f_expBlanks = Av_N_exp_blanks / N_tot; p_value = one-sided binomial test of N_blanks",
     INA        = "INA = individual null allele correction of the genotypes",
     IBD        = "b = slope of FST/(1-FST) against the natural logarithm of geographic distance; Nb = 1/b (neighbourhood size); Nem = Nb/(2*pi) (product of effective density and dispersal)"
   )
@@ -648,7 +649,7 @@ pga_legend <- function(kind = c("fis", "fit", "fst", "div", "null", "ibd")) {
     fit  = c("ID", "BS_indiv", "BS_subs", "BS_loci", "CI", "SE", "P", "FIT", "Overall"),
     fst  = c("ID", "BS_indiv", "BS_subs", "BS_loci", "CI", "SE", "P", "FST", "P_theta", "Overall"),
     div  = c("ID", "BS_indiv", "BS_subs", "BS_loci", "CI", "SE", "HS", "HT", "Overall"),
-    null = c("ID", "BS_indiv", "BS_subs", "BS_loci", "CI_na", "SE", "FSTENA", "FSTraw", "INA"),
+    null = c("ID", "BS_indiv", "BS_subs", "BS_loci", "CI_na", "SE", "FSTENA", "FSTraw", "INA", "PN"),
     ibd  = c("ID", "BS_indiv", "BS_loci", "CI", "SE", "FSTENA", "IBD"))
   c("Abbreviations:", unname(d[keys]))
 }
@@ -697,10 +698,39 @@ pga_append_time <- function(path, t0) {
       file = path, append = TRUE, sep = "")
 }
 
+
+# Methods and references block, written in the parameters part of every output file.
+pga_refs <- function(kind = c("fis", "fit", "fst", "div", "null", "ibd", "ld")) {
+  kind <- match.arg(kind)
+  r <- c(
+    WC    = "Weir BS, Cockerham CC (1984) Estimating F-statistics for the analysis of population structure. Evolution 38: 1358-1370.",
+    NC    = "Nei M, Chesser RK (1983) Estimation of fixation indices and gene diversities. Annals of Human Genetics 47: 253-259.",
+    G96   = "Goudet J, Raymond M, de Meeus T, Rousset F (1996) Testing differentiation in diploid populations. Genetics 144: 1933-1940.",
+    G95   = "Goudet J (1995) FSTAT (version 1.2): a computer program to calculate F-statistics. Journal of Heredity 86: 485-486.",
+    BS    = "Efron B, Tibshirani RJ (1993) An introduction to the bootstrap. Chapman & Hall, New York.",
+    BIAS  = "Bias-shifted CI: percentile interval shifted by (observed value - mean of the bootstrap replicates), width unchanged (Efron and Tibshirani 1993 for the bootstrap).",
+    EM    = "Dempster AP, Laird NM, Rubin DB (1977) Maximum likelihood from incomplete data via the EM algorithm. Journal of the Royal Statistical Society B 39: 1-38.",
+    ENA   = "Chapuis M-P, Estoup A (2007) Microsatellite null alleles and estimation of population differentiation. Molecular Biology and Evolution 24: 621-631 (ENA and INA corrections; FreeNA).",
+    DCSE  = "Cavalli-Sforza LL, Edwards AWF (1967) Phylogenetic analysis: models and estimation procedures. American Journal of Human Genetics 19: 233-257.",
+    ROUS  = "Rousset F (1997) Genetic differentiation and estimation of gene flow from F-statistics under isolation by distance. Genetics 145: 1219-1228.",
+    VINC  = "Vincenty T (1975) Direct and inverse solutions of geodesics on the ellipsoid with application of nested equations. Survey Review 23 (176): 88-93 (geographic distances, WGS84 ellipsoid).",
+    MANT  = "Mantel N (1967) The detection of disease clustering and a generalized regression approach. Cancer Research 27: 209-220."
+  )
+  keys <- switch(kind,
+    fis  = c("WC", "BS", "BIAS"),
+    fit  = c("WC", "BS", "BIAS"),
+    fst  = c("WC", "G96", "G95", "BS", "BIAS"),
+    div  = c("NC", "BS", "BIAS"),
+    null = c("EM", "ENA", "WC", "DCSE", "ROUS", "VINC", "BS", "BIAS"),
+    ibd  = c("ROUS", "WC", "VINC", "MANT", "BS", "BIAS"),
+    ld   = c("G96", "G95"))
+  c("Methods and references:", unname(r[keys]))
+}
+
 # Header block + legend written at the TOP of an output file (after the parameters).
 pga_write_head <- function(con, hdr, kind) {
   writeLines(hdr, con = con, useBytes = TRUE)
-  writeLines(c(pga_legend(kind), ""), con = con, useBytes = TRUE)
+  writeLines(c(pga_refs(kind), "", pga_legend(kind), ""), con = con, useBytes = TRUE)
 }
 
 # Number of loci above which the slow, per-pair/per-locus outputs are discouraged.

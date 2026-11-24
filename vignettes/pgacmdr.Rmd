@@ -138,7 +138,9 @@ columns/locus = columns 9 to 20") before you click **Apply**.
 The package ships a demonstration dataset from Thierry de Meeus' teaching
 material (`inst/extdata/default_dataset.csv`): adult *Boophilus* ticks
 sampled from cattle across New Caledonia, genotyped at 6 microsatellite
-loci (B12, C07, D12, D10, A12, C03) across 8 sampling localities.
+loci (B12, C07, D12, D10, A12, C03) across 8 sampling localities. The file
+carries the host identifier column `HostID` (host number within locality,
+`HostNumber`, and level codes `LevelLocality` and `LevelHost`).
 
 The steps below follow the app's recommended workflow (see the in-app
 **Help** tab for the full reference list).

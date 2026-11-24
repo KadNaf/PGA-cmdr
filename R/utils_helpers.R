@@ -1108,6 +1108,10 @@ detect_columns_auto <- function(df, missing_info) {
   
   marker_idxs <- setdiff(marker_idxs, popcode_idxs)
   
+  block0 <- .find_longest_contiguous_block(marker_idxs)
+  # isolated genotype-like columns outside the main block (e.g. a numeric level code)
+  # are metadata, not markers
+  if (length(block0)) marker_idxs <- intersect(marker_idxs, block0)
   marker_cols <- cn[marker_idxs]
   
   # --- metadata
