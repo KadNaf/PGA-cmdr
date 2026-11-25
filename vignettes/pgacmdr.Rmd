@@ -301,10 +301,10 @@ The *IBD* tab offers two independent analyses:
   than recomputing it, so run Null Alleles first (or upload an external
   pairwise file). Geographic distance is computed automatically from
   Latitude/Longitude set at import. The output gives the slope `b`,
-  `Nb = 1/b` and `Nem = Nb/(2*pi)` for the average line and for the lines
+  `Nb = 1/b` for the average line and for the lines
   through the lower and upper limits of the pairwise intervals (bootstrap over
-  loci, as in Rousset's model), and a second table with `b`, `Nb` and `Nem`
-  and their confidence intervals by **bootstrap over individuals**
+  loci, as in Rousset's model), and a second table with `b` and `Nb`
+  and their confidence intervals by **bootstrap over individuals** (only if "Add bootstraps over individuals" is ticked in Null Alleles)
   (`CI_L_indiv`, `CI_U_indiv`, `SE_indiv`). That second table uses the
   pairwise FST replicates produced by the Null Alleles module (individuals
   resampled within sub-samples, EM re-run on each replicate); each replicate is
@@ -427,5 +427,5 @@ sub-samples this increases the similarity of close sub-samples (low FST), so the
 replicates is biased and the intervals are too wide; the effect is small for strongly
 differentiated pairs, and is strongest with fewer than 5 sub-samples. Pairwise intervals are
 therefore given by the bootstrap over loci by default (Subdivision, Null Alleles, and the
-IBD slope b, Nb and Nem). A tick box adds the BS/Indiv intervals, with a warning. The
+the IBD lines). A tick box adds the BS/Indiv intervals, with a warning. The
 bootstrap and permutation numbers can be set up to 1,000,000.

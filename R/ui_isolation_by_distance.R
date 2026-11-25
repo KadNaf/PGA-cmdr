@@ -136,7 +136,7 @@ isolation_by_distance_UI <- function(id) {
         conditionalPanel(
           condition = sprintf("input['%s'] == 'internal'", ns("mt_source")),
           checkboxInput(ns("mt_use_extra"),
-            "Merge an extra distance file (temporal / ecological / categorical)",
+            "Use another dataset",
             value = FALSE),
           conditionalPanel(
             condition = sprintf("input['%s'] == true", ns("mt_use_extra")),

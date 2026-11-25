@@ -654,7 +654,7 @@ pga_legend <- function(kind = c("fis", "fit", "fst", "div", "null", "ibd")) {
     FSTraw     = "FST_raw = FST not corrected for null alleles",
     PN         = "p_nulls = null allele frequency (EM); Av_p_nulls = mean of p_nulls over sub-samples weighted by N; N = individuals (typed + missing); N_blanks = missing genotypes; N_exp_blanks = N x p_nulls^2 (expected null homozygotes); f_expBlanks = Av_N_exp_blanks / N_tot; p_value = one-sided binomial test of N_blanks",
     INA        = "INA = individual null allele correction of the genotypes",
-    IBD        = "b = slope of FST/(1-FST) against the natural logarithm of geographic distance; Nb = 1/b (neighbourhood size); Nem = Nb/(2*pi) (product of effective density and dispersal)"
+    IBD        = "b = slope of FST/(1-FST) against the natural logarithm of geographic distance; Nb = 1/b (neighbourhood size)"
   )
   keys <- switch(kind,
     fis  = c("ID", "BS_indiv", "BS_subs", "BS_loci", "CI", "SE", "P", "FIS", "Overall"),

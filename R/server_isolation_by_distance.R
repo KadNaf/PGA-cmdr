@@ -207,12 +207,12 @@ server_isolation_by_distance <- function(id, rv) {
         if (!is.na(c) && c %in% nm) suppressWarnings(as.numeric(ext[[c]]))
         else .linearise(fallback_from)
       }
-      df$FR        <- fr_col(c("^FR$"),        df$FST_ENA)
-      df$FR_lo     <- fr_col(c("^FR_lo$"),     df$FST_ENA_lo)
-      df$FR_hi     <- fr_col(c("^FR_hi$"),     df$FST_ENA_hi)
+      df$FR        <- fr_col(c("^FR$", "^FR_ENA$"), df$FST_ENA)
+      df$FR_lo     <- fr_col(c("^FR_lo$", "^FR_ENA_lo_loci$"), df$FST_ENA_lo)
+      df$FR_hi     <- fr_col(c("^FR_hi$", "^FR_ENA_hi_loci$"), df$FST_ENA_hi)
       df$FR_raw    <- fr_col(c("^FR_raw$"),    df$FST_raw)
-      df$FR_raw_lo <- fr_col(c("^FR_raw_lo$"), df$FST_raw_lo)
-      df$FR_raw_hi <- fr_col(c("^FR_raw_hi$"), df$FST_raw_hi)
+      df$FR_raw_lo <- fr_col(c("^FR_raw_lo$", "^FR_raw_lo_loci$"), df$FST_raw_lo)
+      df$FR_raw_hi <- fr_col(c("^FR_raw_hi$", "^FR_raw_hi_loci$"), df$FST_raw_hi)
 
       df$Dgeo_m <- num_col(c("^Dgeo_m$", "^D_geo$", "^Distance$"))
       lnd <- num_col(c("^lnDgeo$", "^ln\\(D_geo\\)$"))
@@ -316,7 +316,7 @@ server_isolation_by_distance <- function(id, rv) {
                   selected = .guess_col(cols, c("^FR_hi$", "^FR_raw_hi$"), if (length(cols)) cols[1] else NULL))
     })
 
-    # Bootstrap over INDIVIDUALS (BS/Indiv) for the slope b, Nb = 1/b and Nem = Nb/(2*pi).
+    # Bootstrap over INDIVIDUALS (BS/Indiv) for the slope b, and Nb = 1/b.
     # Uses the replicates of pairwise FST(-ENA) that the Null Alleles module computed by
     # resampling individuals within sub-samples (EM re-run on every replicate): each
     # replicate is linearised (FST/(1-FST)) and regressed on the geographic distance
@@ -351,68 +351,14 @@ server_isolation_by_distance <- function(id, rv) {
       ci <- pga_ci_bias_shift(b_obs, slope, 1 - (na$alpha %||% 0.05))
       nb_ci <- if (ci[["lo"]] > 0 || ci[["hi"]] < 0) sort(1 / c(ci[["lo"]], ci[["hi"]])) else c(NA_real_, NA_real_)
       out <- data.frame(
-        Statistic  = c("b", "Nb", "Nem"),
-        Estimate   = c(b_obs, 1 / b_obs, 1 / b_obs / (2 * pi)),
-        CI_L_indiv = c(ci[["lo"]], nb_ci[1], nb_ci[1] / (2 * pi)),
-        CI_U_indiv = c(ci[["hi"]], nb_ci[2], nb_ci[2] / (2 * pi)),
-        SE_indiv   = c(stats::sd(slope), NA_real_, NA_real_),
+        Statistic  = c("b", "Nb"),
+        Estimate   = c(b_obs, 1 / b_obs),
+        CI_L_indiv = c(ci[["lo"]], nb_ci[1]),
+        CI_U_indiv = c(ci[["hi"]], nb_ci[2]),
+        SE_indiv   = c(stats::sd(slope), NA_real_),
         stringsAsFactors = FALSE)
       out[, c("Estimate", "CI_L_indiv", "CI_U_indiv", "SE_indiv")] <-
         lapply(out[, c("Estimate", "CI_L_indiv", "CI_U_indiv", "SE_indiv")], function(v) signif(v, 6))
-      attr(out, "n_boot") <- length(slope)
-      out
-    }
-
-    # Bootstrap over LOCI (BS/Loci) for the slope b, Nb = 1/b and Nem = Nb/(2*pi): the loci are
-    # resampled with replacement (same loci for every pair), every pairwise value is recomputed
-    # from the per-locus components (FST: ratio of sums; DCSE: mean over loci), linearised when
-    # the chosen column is FR, and regressed on the chosen geographic distance.
-    .ibd_boot_loci <- function(df, x, col_avg, b_obs) {
-      na <- tryCatch(na_results_r(), error = function(e) NULL)
-      if (isTRUE(identical(input$ibd_source, "external")) || is.null(na) || !is.finite(b_obs)) return(NULL)
-      fp <- na$fst_pair; dp <- na$dc_pair
-      spec <- if (grepl("^FR_raw$|^FST_raw$", col_avg)) list("fst", "raw", grepl("^FR", col_avg))
-              else if (grepl("^FR(_ENA)?$|^FST_ENA$", col_avg)) list("fst", "ena", grepl("^FR", col_avg))
-              else if (grepl("^DCSE_raw$", col_avg)) list("dc", "dc_raw", FALSE)
-              else if (grepl("^DCSE_INA$", col_avg)) list("dc", "dc_ina", FALSE)
-              else return(NULL)
-      pr <- if (spec[[1]] == "fst") fp else dp
-      if (is.null(pr)) return(NULL)
-      pn <- vapply(pr$pairs, function(z) paste(z[1], z[2]), "")
-      k <- match(paste(df$Pop1, df$Pop2), pn)
-      if (anyNA(k)) return(NULL)
-      L <- length(pr$markers); B <- as.integer(na$nboot %||% 1000L)
-      if (L < 2L || B < 10L) return(NULL)
-      set.seed(as.integer((na$seed %||% 1L) %% .Machine$integer.max))
-      idx <- matrix(sample.int(L, L * B, replace = TRUE), nrow = L)
-      cnt <- matrix(0, L, B); for (b in seq_len(B)) { tb <- tabulate(idx[, b], L); cnt[, b] <- tb }
-      Y <- if (spec[[1]] == "fst") {
-        S1 <- pr[[paste0("s1_", spec[[2]])]][k, , drop = FALSE]; S3 <- pr[[paste0("s3_", spec[[2]])]][k, , drop = FALSE]
-        R3 <- S3 %*% cnt; ifelse(R3 > 0, (S1 %*% cnt) / R3, NA_real_)
-      } else {
-        D <- pr[[spec[[2]]]][k, , drop = FALSE]; D[!is.finite(D)] <- 0
-        (D %*% cnt) / L
-      }
-      if (isTRUE(spec[[3]])) Y <- .linearise(Y)
-      ok <- is.finite(x)
-      xs <- x[ok] - mean(x[ok]); sxx <- sum(xs^2)
-      if (sum(ok) < 3L || sxx == 0) return(NULL)
-      Yo <- Y[ok, , drop = FALSE]
-      good <- colSums(!is.finite(Yo)) == 0L
-      slope <- as.numeric(crossprod(xs, sweep(Yo[, good, drop = FALSE], 2, colMeans(Yo[, good, drop = FALSE]))) / sxx)
-      slope <- slope[is.finite(slope)]
-      if (length(slope) < 10L) return(NULL)
-      ci <- pga_ci_bias_shift(b_obs, slope, 1 - (na$alpha %||% 0.05))
-      nb_ci <- if (ci[["lo"]] > 0 || ci[["hi"]] < 0) sort(1 / c(ci[["lo"]], ci[["hi"]])) else c(NA_real_, NA_real_)
-      out <- data.frame(
-        Statistic  = c("b", "Nb", "Nem"),
-        Estimate   = c(b_obs, 1 / b_obs, 1 / b_obs / (2 * pi)),
-        CI_L_loci  = c(ci[["lo"]], nb_ci[1], nb_ci[1] / (2 * pi)),
-        CI_U_loci  = c(ci[["hi"]], nb_ci[2], nb_ci[2] / (2 * pi)),
-        SE_loci    = c(stats::sd(slope), NA_real_, NA_real_),
-        stringsAsFactors = FALSE)
-      out[, c("Estimate", "CI_L_loci", "CI_U_loci", "SE_loci")] <-
-        lapply(out[, c("Estimate", "CI_L_loci", "CI_U_loci", "SE_loci")], function(v) signif(v, 6))
       attr(out, "n_boot") <- length(slope)
       out
     }
@@ -440,9 +386,9 @@ server_isolation_by_distance <- function(id, rv) {
 
       nbnem <- function(reg) {
         b <- round(reg$slope, 6)
-        if (is.na(b) || b == 0) return(c(b = b, Nb = NA_real_, Nem = NA_real_))
+        if (is.na(b) || b == 0) return(c(b = b, Nb = NA_real_))
         Nb <- 1 / b
-        c(b = b, Nb = round(Nb, 2), Nem = round(Nb / (2 * pi), 2))
+        c(b = b, Nb = round(Nb, 2))
       }
       summ <- rbind(
         c(Line = "Average",  nbnem(reg_avg)),
@@ -451,9 +397,8 @@ server_isolation_by_distance <- function(id, rv) {
       )
 
       boot_indiv <- .ibd_boot_indiv(df, x, input$ibd_col_avg, reg_avg$slope)
-      boot_loci  <- .ibd_boot_loci(df, x, input$ibd_col_avg, reg_avg$slope)
 
-      list(df = df, x = x, y_avg = y_avg, y_lo = y_lo, y_hi = y_hi, boot_indiv = boot_indiv, boot_loci = boot_loci,
+      list(df = df, x = x, y_avg = y_avg, y_lo = y_lo, y_hi = y_hi, boot_indiv = boot_indiv,
            x_label = x_label, y_label = y_label,
            col_geo = input$ibd_col_geo, col_avg = input$ibd_col_avg,
            col_lo = input$ibd_col_lo, col_hi = input$ibd_col_hi,
@@ -469,20 +414,12 @@ server_isolation_by_distance <- function(id, rv) {
       r <- ibd_results_r()
       s <- as.data.frame(r$summary, stringsAsFactors = FALSE)
       writeLines(c("Isolation by Distance - Regression results", "", pga_refs("ibd"), "", pga_legend("ibd"), ""), con = con, useBytes = TRUE)
-      writeLines("Table 1: regression of genetic distance (FST/(1-FST)) on geographic distance. Line = Average (observed pairwise values) and 95%CI-i / 95%CI-s (lines through the lower / upper limits of the pairwise intervals obtained by bootstrap over loci, BS/Loci). b = slope, Nb = 1/b (neighbourhood size), Nem = Nb/(2*pi)", con = con)
+      writeLines("Table 1: regression of genetic distance (FST/(1-FST)) on geographic distance. Line = Average (observed pairwise values) and 95%CI-i / 95%CI-s (lines through the lower / upper limits of the pairwise intervals obtained by bootstrap over loci, BS/Loci). b = slope, Nb = 1/b (neighbourhood size)", con = con)
       write.table(s, file = con, sep = "\t", row.names = FALSE, quote = FALSE)
-      bl <- r$boot_loci
       bi <- r$boot_indiv
-      writeLines("", con = con)
-      if (!is.null(bl)) {
-        writeLines(sprintf("Table 2: slope b, Nb and Nem with confidence intervals (CI_L_loci and CI_U_loci) and standard error (SE_loci) by bootstrap over loci (BS/Loci: loci resampled with replacement, %d replicates)", attr(bl, "n_boot")), con = con)
-        write.table(bl, file = con, sep = "\t", row.names = FALSE, quote = FALSE)
-      } else {
-        writeLines("Table 2: bootstrap over loci (BS/Loci) not available (pairwise table uploaded from a file, or genetic distance column other than FR, FR_raw, FST_raw, FST_ENA, DCSE_raw, DCSE_INA)", con = con)
-      }
       if (!is.null(bi)) {
         writeLines("", con = con)
-        writeLines(sprintf("Table 3: slope b, Nb and Nem with confidence intervals (CI_L_indiv and CI_U_indiv) and standard error (SE_indiv) by bootstrap over individuals (BS/Indiv, %d replicates). Warning: BS/Indiv of pairwise FST is biased when FST is low or with fewer than 5 sub-samples", attr(bi, "n_boot")), con = con)
+        writeLines(sprintf("Table 2: slope b and Nb with confidence intervals (CI_L_indiv and CI_U_indiv) and standard error (SE_indiv) by BS/Indiv (%d replicates). Warning: biased when FST is low or with fewer than 5 sub-samples", attr(bi, "n_boot")), con = con)
         write.table(bi, file = con, sep = "\t", row.names = FALSE, quote = FALSE)
       }
       if (!is.null(t_compute)) pga_write_time(con, Sys.time() - as.numeric(t_compute, units = "secs"))
@@ -625,10 +562,23 @@ server_isolation_by_distance <- function(id, rv) {
     }
 
     .mt_read_file <- function(fileinfo, sep, header) {
-      df <- tryCatch(read.table(fileinfo$datapath, header = header, sep = sep,
-                                stringsAsFactors = FALSE, check.names = FALSE,
-                                fill = TRUE, quote = "\""),
-                     error = function(e) NULL)
+      df <- tryCatch({
+        path <- fileinfo$datapath
+        lines <- readLines(path, warn = FALSE)
+        nf <- utils::count.fields(path, sep = sep, quote = "\"", blank.lines.skip = FALSE,
+                                  comment.char = "")
+        ok <- which(!is.na(nf) & nf >= 2L)
+        # Files written by PGA-cmdr (or by other tools) may start with comment lines: the table
+        # is the block of lines with the most frequent number of fields.
+        if (length(ok)) {
+          modal <- as.integer(names(which.max(table(nf[ok]))))
+          idx <- which(!is.na(nf) & nf == modal)
+          lines <- lines[min(idx):max(idx)]
+        }
+        read.table(text = lines, header = header, sep = sep,
+                   stringsAsFactors = FALSE, check.names = FALSE,
+                   fill = TRUE, quote = "\"", comment.char = "")
+      }, error = function(e) NULL)
       shiny::validate(shiny::need(!is.null(df) && nrow(df) >= 3L,
         "Could not parse the file. Check separator / header settings."))
       df
@@ -679,7 +629,7 @@ server_isolation_by_distance <- function(id, rv) {
       )
       if (!has_dgeo) {
         tags$p(style="color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:4px;padding:4px 6px;font-size:11px;margin-top:6px;",
-          icon("exclamation-triangle"), " No GPS coordinates and/or no ", tags$code("Dgeo_m"), "/",
+          icon("exclamation-triangle"), " No ", tags$code("Dgeo_m"), " or ",
           tags$code("lnDgeo"), " column found in this file.")
       }
     })

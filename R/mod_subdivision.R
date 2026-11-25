@@ -20,7 +20,7 @@ mod_subdivision_ui <- function(id) {
             numericInput(ns("n_boot_fst"),     "Number of Bootstrap Replicates:", value = 10000, min = 100,  max = 1000000, step = 100),
             numericInput(ns("conf_level_fst"), "Confidence Level:",               value = 0.95, min = 0.80, max = 0.99,  step = 0.01),
             checkboxInput(ns("fst_pairs"), "Pairwise FST between sub-samples, multilocus (Section 3; the slowest part with many loci or sub-samples)", value = FALSE),
-            checkboxInput(ns("fst_pairs_indiv"), "Pairwise FST: add BS/Indiv confidence intervals (not recommended: biased when FST is low or with fewer than 5 sub-samples; BS/Loci is used otherwise)", value = FALSE),
+            checkboxInput(ns("fst_pairs_indiv"), "Add bootstraps over individuals (not recommended, see documentation)", value = FALSE),
             checkboxInput(ns("fst_pairs_loci"), "Pairwise FST per locus (Section 4; slow and very large with many loci)", value = FALSE),
             checkboxInput(ns("fst_detail"), "Add the bootstrap replicate values (detail) at the end of the file", value = FALSE),
             uiOutput(ns("ui_fst_out_status")),

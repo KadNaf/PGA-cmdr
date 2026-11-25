@@ -1302,6 +1302,14 @@ server_null_alleles <- function(id, rv) {
                   quote = FALSE, col.names = TRUE)
     }
 
+    # Data file meant to be re-loaded (IBD / Mantel): table only, comments are in run_parameters
+    write_table_only <- function(df, file, sep = "\t") {
+      names(df)[names(df) == "Pop1"] <- "Sub_sample_1"
+      names(df)[names(df) == "Pop2"] <- "Sub_sample_2"
+      utils::write.table(df, file = file, sep = sep, row.names = FALSE, quote = FALSE,
+                         col.names = TRUE, fileEncoding = "UTF-8")
+    }
+
     # ??????????????????????????????????????????????????????????????????????????
     #  FILE 1 - Null allele frequencies
     # ??????????????????????????????????????????????????????????????????????????
@@ -1723,7 +1731,7 @@ server_null_alleles <- function(id, rv) {
     output$dl_file7_txt <- downloadHandler(
       filename = function() out_filename("full_pairwise_table"),
       content  = function(file) { d <- file7_data()
-        write_with_header(d$header, d$data, file, sep="\t") }
+        write_table_only(d$data, file, sep="\t") }
     )
 
     # -- Download buttons UI (fallback / always available) ---------------------
@@ -1812,7 +1820,7 @@ server_null_alleles <- function(id, rv) {
       if (isTRUE(include_pairwise_r())) {
         d7 <- file7_data()
         p7 <- file.path(tmpdir, out_filename("-full_pairwise_table"))
-        write_with_header(d7$header, d7$data, p7, sep = "\t")
+        write_table_only(d7$data, p7, sep = "\t")
         all_files <- c(all_files, p7)
       }
       all_files

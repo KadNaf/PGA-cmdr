@@ -127,7 +127,7 @@ null_alleles_UI <- function(id) {
         checkboxInput(ns("per_locus_pairs"),
           "Per-locus pairwise FST/DCSE (half-matrices file)", value = FALSE),
         checkboxInput(ns("boot_indiv_pairs"),
-          "Pairwise FST/DCSE and IBD slope: add BS/Indiv confidence intervals (not recommended: biased when FST is low or with fewer than 5 sub-samples; BS/Loci is used otherwise)", value = FALSE),
+          "Add bootstraps over individuals (not recommended, see documentation)", value = FALSE),
         checkboxInput(ns("boot_detail"),
           "Bootstrap distributions (file with all replicate values)", value = FALSE),
         tags$p(style = "color:#a15c00;font-size:12px;margin:2px 0 6px 0;",
