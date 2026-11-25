@@ -2318,7 +2318,7 @@ server_general_stats <- function(id, rv) {
           writeLines("", con = con)
           if (!is.null(con4)) {
             close(con4); con4_open <- FALSE
-            writeLines("Section 4: pairwise FST between sub-samples, per locus, confidence intervals and standard errors by BS/Indiv, G-based permutation p-values", con = con)
+            writeLines(paste0("Section 4: pairwise FST between sub-samples, per locus", if (isTRUE(input$fst_pairs_indiv)) ", confidence intervals and standard errors by BS/Indiv" else "", ", G-based permutation p-values"), con = con)
             cin <- file(tmp4, open = "r", encoding = "UTF-8")
             repeat { ln <- readLines(cin, n = 50000L); if (!length(ln)) break; writeLines(ln, con = con, useBytes = TRUE) }
             close(cin)
