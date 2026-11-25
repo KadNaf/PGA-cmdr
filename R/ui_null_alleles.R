@@ -86,17 +86,17 @@ null_alleles_UI <- function(id) {
           tags$div(style = "flex:1; min-width:190px; padding-right:16px;",
             numericInput(ns("nboot"),
               label = "Bootstraps over loci (at least 100):",
-              value = 5000, min = 100, max = 99999, step = 1000, width = "100%")),
+              value = 5000, min = 100, max = 1000000, step = 1000, width = "100%")),
           tags$div(style = "border-left:1px solid #dcdfe4; flex:1; min-width:190px; padding:0 16px;",
             numericInput(ns("nboot_subs"),
               label = "Bootstraps over subsamples (at least 100):",
-              value = 5000, min = 100, max = 99999, step = 1000, width = "100%"))
+              value = 5000, min = 100, max = 1000000, step = 1000, width = "100%"))
         ),
         tags$div(style = "display:flex; align-items:flex-start; gap:0; flex-wrap:wrap; margin-top:8px;",
           tags$div(style = "flex:1; min-width:190px; padding-right:16px;",
             numericInput(ns("nboot_indiv"),
               label = "Bootstraps over individuals (at least 100):",
-              value = 5000, min = 100, max = 20000, step = 100, width = "100%"))
+              value = 5000, min = 100, max = 1000000, step = 100, width = "100%"))
         ),
         tags$div(style = "display:flex; align-items:flex-start; gap:0; flex-wrap:wrap; margin-top:8px;",
           tags$div(style = "flex:1; min-width:190px; padding-right:16px;",
@@ -125,9 +125,13 @@ null_alleles_UI <- function(id) {
 
         h4(icon("list-check"), "Optional outputs"),
         checkboxInput(ns("per_locus_pairs"),
-          "Per-locus pairwise FST/DCSE (half-matrices file; slow and very large with many loci)", value = FALSE),
+          "Per-locus pairwise FST/DCSE (half-matrices file)", value = FALSE),
+        checkboxInput(ns("boot_indiv_pairs"),
+          "Pairwise FST/DCSE and IBD slope: add BS/Indiv confidence intervals (not recommended: biased when FST is low or with fewer than 5 sub-samples; BS/Loci is used otherwise)", value = FALSE),
         checkboxInput(ns("boot_detail"),
           "Bootstrap distributions (file with all replicate values)", value = FALSE),
+        tags$p(style = "color:#a15c00;font-size:12px;margin:2px 0 6px 0;",
+          "Warning: exponential increase of process duration and output file size with the number of loci"),
         uiOutput(ns("ui_many_loci_warning")),
 
         tags$hr(),

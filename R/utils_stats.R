@@ -475,7 +475,11 @@ pga_n_abs_ge <- function(null, obs, tol = PGA_TIE_TOL) sum(abs(null) >= abs(obs)
 # ---------------------------------------------------------------------------
 pga_pairwise_fst <- function(mat, base = 1000L, n_boot = 1000L, n_perm = 1000L,
                              conf_level = 0.95, seed = 1, missing_code = 0L,
-                             n_threads = 1L, per_locus = TRUE, on_pair = NULL) {
+                             n_threads = 1L, per_locus = TRUE, on_pair = NULL, boot_indiv = FALSE) {
+  # boot_indiv = FALSE (default): no bootstrap over individuals for the pairs. Resampling
+  # individuals duplicates multilocus genotypes, which inflates the similarity of the two
+  # sub-samples (FST biased and CI too wide when FST is low or when there are few
+  # sub-samples); the pairwise CI is then given by the bootstrap over loci only.
   # per_locus = FALSE: only the multilocus table (no pair x locus table).
   # on_pair(k, n_pairs, overall_row, per_locus_block): called after every pair, so that
   # the caller can write its results to the file as they are produced (the returned
@@ -500,9 +504,12 @@ pga_pairwise_fst <- function(mat, base = 1000L, n_boot = 1000L, n_perm = 1000L,
     bl <- pga_boot_over_loci(comp$A, comp$B, comp$C, comp$HS, comp$HT,
                              n_boot = n_boot, conf_level = conf_level, seed = seed + k)$table
     bl <- bl[bl$Statistic == "FST", ]
-    bi <- boot_indiv_wc84_cpp(sub, 1L, as.integer(missing_code), as.integer(base),
-                              as.integer(n_boot), as.numeric(seed + k), as.integer(n_threads))
-    ci_o <- pga_ci_bias_shift(obs$FST_overall_ratio_of_sums, bi$FST_overall_boot, conf_level)
+    bi <- NULL
+    if (isTRUE(boot_indiv)) {
+      bi <- boot_indiv_wc84_cpp(sub, 1L, as.integer(missing_code), as.integer(base),
+                                as.integer(n_boot), as.numeric(seed + k), as.integer(n_threads))
+      ci_o <- pga_ci_bias_shift(obs$FST_overall_ratio_of_sums, bi$FST_overall_boot, conf_level)
+    }
     p_o <- NA_real_; p_l <- rep(NA_real_, length(loc))
     if (n_perm > 0) {
       pr <- batch_permute_wc84_fst_auto(sub, 1L, as.integer(missing_code), as.integer(base),
@@ -513,19 +520,24 @@ pga_pairwise_fst <- function(mat, base = 1000L, n_boot = 1000L, n_perm = 1000L,
     }
     ov[[k]] <- data.frame(Sub_sample_1 = nm(codes[i]), Sub_sample_2 = nm(codes[j]),
                           N1 = n1, N2 = n2, FST = obs$FST_overall_ratio_of_sums,
-                          SE_indiv = stats::sd(bi$FST_overall_boot, na.rm = TRUE),
-                          CI_L_indiv = ci_o[["lo"]], CI_U_indiv = ci_o[["hi"]],
-                          SE_loci = bl$SE, CI_L_loci = bl$CI_L, CI_U_loci = bl$CI_U,
-                          P_value = p_o, stringsAsFactors = FALSE)
+                          stringsAsFactors = FALSE)
+    if (!is.null(bi)) {
+      ov[[k]]$SE_indiv <- stats::sd(bi$FST_overall_boot, na.rm = TRUE)
+      ov[[k]]$CI_L_indiv <- ci_o[["lo"]]; ov[[k]]$CI_U_indiv <- ci_o[["hi"]]
+    }
+    ov[[k]]$SE_loci <- bl$SE; ov[[k]]$CI_L_loci <- bl$CI_L; ov[[k]]$CI_U_loci <- bl$CI_U
+    ov[[k]]$P_value <- p_o
     blk <- NULL
     if (isTRUE(per_locus)) {
-      ci_l <- vapply(seq_along(loc), function(q)
-        pga_ci_bias_shift(obs$FST[q], bi$FST_boot[, q], conf_level), numeric(2))
       blk <- data.frame(Sub_sample_1 = nm(codes[i]), Sub_sample_2 = nm(codes[j]),
-                        Locus = loc, FST = as.numeric(obs$FST),
-                        SE_indiv = apply(bi$FST_boot, 2, stats::sd, na.rm = TRUE),
-                        CI_L_indiv = ci_l[1, ], CI_U_indiv = ci_l[2, ],
-                        P_value = p_l, stringsAsFactors = FALSE)
+                        Locus = loc, FST = as.numeric(obs$FST), stringsAsFactors = FALSE)
+      if (!is.null(bi)) {
+        ci_l <- vapply(seq_along(loc), function(q)
+          pga_ci_bias_shift(obs$FST[q], bi$FST_boot[, q], conf_level), numeric(2))
+        blk$SE_indiv <- apply(bi$FST_boot, 2, stats::sd, na.rm = TRUE)
+        blk$CI_L_indiv <- ci_l[1, ]; blk$CI_U_indiv <- ci_l[2, ]
+      }
+      blk$P_value <- p_l
     }
     if (is.function(on_pair)) {
       on_pair(k, n_pairs, ov[[k]], blk)

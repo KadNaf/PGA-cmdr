@@ -180,14 +180,14 @@ test_that("pga_pairwise_fst: callback and per_locus option give the same numbers
   mat <- default_matrix()
   keep <- mat[, 1] %in% sort(unique(mat[, 1]))[1:3]
   m <- mat[keep, , drop = FALSE]; attr(m, "pop_levels") <- attr(mat, "pop_levels")
-  full <- pga_pairwise_fst(m, base = 1000L, n_boot = 50L, n_perm = 50L, seed = 3, n_threads = 1L)
+  full <- pga_pairwise_fst(m, base = 1000L, n_boot = 50L, n_perm = 50L, seed = 3, n_threads = 1L, boot_indiv = TRUE)
   r3 <- list(); r4 <- list()
-  cb <- pga_pairwise_fst(m, base = 1000L, n_boot = 50L, n_perm = 50L, seed = 3, n_threads = 1L,
+  cb <- pga_pairwise_fst(m, base = 1000L, n_boot = 50L, n_perm = 50L, seed = 3, n_threads = 1L, boot_indiv = TRUE,
                          on_pair = function(k, n, o, b) { r3[[k]] <<- o; r4[[k]] <<- b })
   expect_null(cb$overall)
   expect_equal(do.call(rbind, r3), full$overall, check.attributes = FALSE)
   expect_equal(do.call(rbind, r4), full$per_locus, check.attributes = FALSE)
-  nopl <- pga_pairwise_fst(m, base = 1000L, n_boot = 50L, n_perm = 50L, seed = 3, n_threads = 1L, per_locus = FALSE)
+  nopl <- pga_pairwise_fst(m, base = 1000L, n_boot = 50L, n_perm = 50L, seed = 3, n_threads = 1L, boot_indiv = TRUE, per_locus = FALSE)
   expect_null(nopl$per_locus)
   expect_equal(nopl$overall, full$overall)
 })

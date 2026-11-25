@@ -2218,6 +2218,7 @@ server_general_stats <- function(id, rv) {
         if (!is.null(nc)) sprintf("Complete multilocus genotypes per sample: %s; total = %d",
                                    paste(sprintf("%s = %d", names(nc), nc), collapse = ", "), sum(nc)),
         sprintf("Pairwise FST between sub-samples (Section 3): %s", if (isTRUE(input$fst_pairs)) "yes" else "no"),
+        sprintf("Pairwise FST with BS/Indiv intervals: %s", if (isTRUE(input$fst_pairs_indiv)) "yes (warning: biased when FST is low or with fewer than 5 sub-samples)" else "no (BS/Loci only)"),
         sprintf("Pairwise FST per locus (Section 4): %s", if (isTRUE(input$fst_pairs_loci)) "yes" else "no"),
         sprintf("Bootstrap replicate values (detail): %s", if (isTRUE(input$fst_detail)) "yes" else "no"),
         ""
@@ -2257,6 +2258,10 @@ server_general_stats <- function(id, rv) {
         n_loci <- tryCatch(n_loci_db_r(), error = function(e) NA_real_)
         if (isTRUE(input$fst_pairs_loci) && is.finite(n_loci) && n_loci > PGA_MANY_LOCI)
           showNotification(pga_many_loci_warning(n_loci), type = "warning", duration = 20)
+        n_subs_fst <- tryCatch(length(unique(hf_mat_r()[, 1])), error = function(e) NA_integer_)
+        if (isTRUE(input$fst_pairs_indiv) && is.finite(n_subs_fst) && n_subs_fst < 5L)
+          showNotification("Warning: BS/Indiv for pairwise FST is biased with fewer than 5 sub-samples (duplicated genotypes inflate the similarity of close sub-samples); prefer BS/Loci.",
+                           type = "warning", duration = 20)
 
         # The file is written as the results are produced and is closed BEFORE "Done".
         con <- file(file, open = "w", encoding = "UTF-8")
@@ -2290,11 +2295,11 @@ server_general_stats <- function(id, rv) {
           on.exit({ if (con4_open) try(close(con4), silent = TRUE); if (!is.null(tmp4)) unlink(tmp4) }, add = TRUE)
           first3 <- TRUE; first4 <- TRUE
           if (isTRUE(input$fst_pairs))
-            writeLines("Section 3: pairwise FST between sub-samples (multilocus), N1 and N2 = numbers of individuals of the two sub-samples, confidence intervals by BS/Indiv and BS/Loci, standard errors (SE) and G-based permutation p-value", con = con)
+            writeLines("Section 3: pairwise FST between sub-samples (multilocus), N1 and N2 = numbers of individuals of the two sub-samples, confidence intervals by BS/Loci (and BS/Indiv when requested), standard errors (SE) and G-based permutation p-value", con = con)
           pw <- tryCatch(
             pga_pairwise_fst(hf_mat_r(), base = base_r(), n_boot = nb, n_perm = npm,
                              conf_level = input$conf_level_fst, seed = .seed(), n_threads = .n_threads(),
-                             per_locus = isTRUE(input$fst_pairs_loci),
+                             per_locus = isTRUE(input$fst_pairs_loci), boot_indiv = isTRUE(input$fst_pairs_indiv),
                              on_pair = function(k, n, ov_row, blk) {
                                if (isTRUE(input$fst_pairs)) {
                                  utils::write.table(pga_se_p_last(ov_row), file = con, sep = "\t", row.names = FALSE,

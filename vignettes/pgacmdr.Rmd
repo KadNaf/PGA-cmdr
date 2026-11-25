@@ -418,3 +418,14 @@ re-run Null Alleles before trusting IBD's regression output.
 ```{r session}
 sessionInfo()
 ```
+
+
+## Bootstrap over individuals for pairwise FST
+
+Resampling individuals with replacement duplicates multilocus genotypes. For pairs of
+sub-samples this increases the similarity of close sub-samples (low FST), so the FST of the
+replicates is biased and the intervals are too wide; the effect is small for strongly
+differentiated pairs, and is strongest with fewer than 5 sub-samples. Pairwise intervals are
+therefore given by the bootstrap over loci by default (Subdivision, Null Alleles, and the
+IBD slope b, Nb and Nem). A tick box adds the BS/Indiv intervals, with a warning. The
+bootstrap and permutation numbers can be set up to 1,000,000.

@@ -1027,9 +1027,9 @@ server_null_alleles <- function(id, rv) {
     # ??????????????????????????????????????????????????????????????????????????
     .run_computation <- function() {
       req(db_ready())
-      nboot      <- max(100L, min(99999L, as.integer(input$nboot %||% 5000L)))
-      nboot_subs <- max(50L,  min(20000L, as.integer(input$nboot_subs %||% 500L)))
-      nboot_indiv <- max(100L, min(20000L, as.integer(input$nboot_indiv %||% 5000L)))
+      nboot      <- max(100L, min(1000000L, as.integer(input$nboot %||% 5000L)))
+      nboot_subs <- max(50L,  min(1000000L, as.integer(input$nboot_subs %||% 5000L)))
+      nboot_indiv <- max(100L, min(1000000L, as.integer(input$nboot_indiv %||% 5000L)))
       alpha   <- as.numeric(input$alpha %||% 0.05)
       if (!is.finite(alpha) || alpha <= 0 || alpha >= 1) alpha <- 0.05
       ci      <- ci_bounds(alpha)
@@ -1215,7 +1215,7 @@ server_null_alleles <- function(id, rv) {
           seed = seed,
           treats = treats, markers = markers, pops = pops,
           em_res = em_res,
-          opts = list(per_locus_pairs = isTRUE(input$per_locus_pairs), boot_detail = isTRUE(input$boot_detail))
+          opts = list(per_locus_pairs = isTRUE(input$per_locus_pairs), boot_detail = isTRUE(input$boot_detail), boot_indiv_pairs = isTRUE(input$boot_indiv_pairs))
         )
       })
     }
@@ -1717,7 +1717,7 @@ server_null_alleles <- function(id, rv) {
     file7_data <- reactive({
       shiny::req(include_pairwise_r())
       list(header = na_head(results_r(), if (isTRUE(gps_available_r())) "Null alleles - full pairwise table (FST, FST-ENA, DCSE, DCSE-INA, FR, D_geo, ln(D_geo))" else "Null alleles - full pairwise table (FST, FST-ENA, DCSE, DCSE-INA, FR; no GPS coordinates, so no D_geo)"),
-           data   = .label_pairwise_cols(full_pairwise_r(), results_r()$boot_indiv$pair))
+           data   = .label_pairwise_cols(full_pairwise_r(), if (isTRUE(results_r()$opts$boot_indiv_pairs)) results_r()$boot_indiv$pair else NULL))
     })
 
     output$dl_file7_txt <- downloadHandler(

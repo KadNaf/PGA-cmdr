@@ -16,8 +16,8 @@ mod_global_panmixia_ui <- function(id) {
         fluidRow(
           column(3,
             h4(icon("sliders"), "Parameters"),
-            numericInput(ns("n_perm_fit"),    "Number of Permutations:",        value = 10000, min = 100, max = 20000, step = 100),
-            numericInput(ns("n_boot_fit"),    "Number of Bootstrap Replicates:", value = 10000, min = 100, max = 20000, step = 100),
+            numericInput(ns("n_perm_fit"),    "Number of Permutations:",        value = 10000, min = 100, max = 1000000, step = 100),
+            numericInput(ns("n_boot_fit"),    "Number of Bootstrap Replicates:", value = 10000, min = 100, max = 1000000, step = 100),
             numericInput(ns("conf_level_fit"),"Confidence Level:",               value = 0.95, min = 0.80, max = 0.99, step = 0.01),
             uiOutput(ns("ui_fit_out_status")),
             downloadButton(ns("Run_FIT_Analysis"), " Run",

@@ -33,7 +33,7 @@ test_that("bias-shifted BS/indiv CI is centred on the observed value, observed u
 
 test_that("pairwise FST: one row per pair, observed equals direct computation, CI ordered", {
   m <- sim_island2(r = 4L, n = 30L, L = 6L)
-  pw <- pga_pairwise_fst(m, base = 100L, n_boot = 100L, n_perm = 99L, n_threads = 1L)
+  pw <- pga_pairwise_fst(m, base = 100L, n_boot = 100L, n_perm = 99L, n_threads = 1L, boot_indiv = TRUE)
   expect_equal(nrow(pw$overall), 6L)
   expect_equal(nrow(pw$per_locus), 6L * 6L)
   sub <- m[m[, 1] %in% c(1L, 2L), ]
