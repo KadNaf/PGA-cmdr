@@ -429,3 +429,10 @@ differentiated pairs, and is strongest with fewer than 5 sub-samples. Pairwise i
 therefore given by the bootstrap over loci by default (Subdivision, Null Alleles, and the
 the IBD lines). A tick box adds the BS/Indiv intervals, with a warning. The
 bootstrap and permutation numbers can be set up to 1,000,000.
+
+## IBD with any distance file
+
+The IBD module can analyse any pairwise distance file, whatever the column names: the first
+two columns identify the sub-samples, and any numeric column can be chosen as geographic
+distance, genetic distance and lower and higher limits. The separator is detected
+automatically. The Mantel p-value is always (b+1)/(m+1).

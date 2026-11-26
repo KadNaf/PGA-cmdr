@@ -32,7 +32,7 @@ isolation_by_distance_UI <- function(id) {
           condition = sprintf("input['%s'] == 'external'", ns("ibd_source")),
           fluidRow(
             column(6,
-              fileInput(ns("ibd_ext_file"), "Pairwise file (Pop1, Pop2, FST_ENA, DCSE_INA, Dgeo_m\u2026):",
+              fileInput(ns("ibd_ext_file"), "Distance file (2 identifier columns, then any numeric columns):",
                         accept = c(".csv", ".txt", ".tsv")),
               radioButtons(ns("ibd_ext_sep"), "Separator:",
                 choices = c("Tab" = "\t", "Comma" = ",", "Semicolon" = ";"),
@@ -40,8 +40,7 @@ isolation_by_distance_UI <- function(id) {
               checkboxInput(ns("ibd_ext_header"), "File has header row", value = TRUE)
             ),
             column(6,
-              uiOutput(ns("ibd_ext_file_status")),
-              uiOutput(ns("ibd_ext_dgeo_warning"))
+              uiOutput(ns("ibd_ext_file_status"))
             )
           )
         )
@@ -174,10 +173,6 @@ isolation_by_distance_UI <- function(id) {
               selected = "r")
           ),
           column(3,
-            radioButtons(ns("mt_p_formula"), "p-value formula:",
-              choices = c("(b+1)/(m+1) \u2014 corrected" = "plus1",
-                          "b/m \u2014 plain proportion"   = "plain"),
-              selected = "plus1"),
             numericInput(ns("mt_n_perm"), "Permutations:",
                          value = 10000, min = 99, max = 200000, step = 1000)
           ),

@@ -170,54 +170,28 @@ server_isolation_by_distance <- function(id, rv) {
     #    FR/FR_raw + CI, Dgeo_m, lnDgeo) are used directly when present;
     #    anything missing is derived when possible (FR from FST via
     #    Rousset's linearisation, lnDgeo from Dgeo_m) or left NA otherwise.
+    # EXTERNAL SOURCE: fully independent of the other modules. Any pairwise distance file:
+    # the first two columns identify the sub-samples (or columns named Pop1/Pop2,
+    # Sub_sample_1/Sub_sample_2, ...); every other column that is numeric can be chosen as
+    # geographic distance, genetic distance or interval limit, whatever its name.
     full_pair_table_external_r <- reactive({
       shiny::req(input$ibd_ext_file)
       shiny::validate(shiny::need(identical(ext_ver$ibd, rv$dataset_id %||% 0L), .stale_msg))
       ext <- .mt_read_file(input$ibd_ext_file, input$ibd_ext_sep, input$ibd_ext_header)
       nm <- names(ext)
-      pop1_col <- .guess_col(nm, c("^Pop1$", "^Sub_sample_1$", "^Farm1$", "^ID1$"), nm[1])
-      pop2_col <- .guess_col(nm, c("^Pop2$", "^Sub_sample_2$", "^Farm2$", "^ID2$"), nm[2])
-      shiny::validate(shiny::need(!identical(pop1_col, pop2_col),
-        "Could not identify two distinct Sub_sample_1/Sub_sample_2 columns in the uploaded file."))
-
+      pop1_col <- .guess_col(nm, c("^Pop1$", "^Sub_sample_1$", "^Farm1$", "^ID1$", "^Ss1$"), nm[1])
+      pop2_col <- .guess_col(nm, c("^Pop2$", "^Sub_sample_2$", "^Farm2$", "^ID2$", "^Ss2$"), nm[2])
+      if (identical(pop1_col, pop2_col)) { pop1_col <- nm[1]; pop2_col <- nm[2] }
       df <- data.frame(Pop1 = trimws(as.character(ext[[pop1_col]])),
-                        Pop2 = trimws(as.character(ext[[pop2_col]])),
-                        stringsAsFactors = FALSE)
-
-      num_col <- function(pats) {
-        c <- .guess_col(nm, pats, NA_character_)
-        if (is.na(c) || !(c %in% nm)) rep(NA_real_, nrow(ext))
-        else suppressWarnings(as.numeric(ext[[c]]))
+                       Pop2 = trimws(as.character(ext[[pop2_col]])),
+                       stringsAsFactors = FALSE)
+      for (cn in setdiff(nm, c(pop1_col, pop2_col))) {
+        v <- ext[[cn]]
+        if (!is.numeric(v)) v <- suppressWarnings(as.numeric(gsub(",", ".", trimws(as.character(v)), fixed = TRUE)))
+        if (sum(is.finite(v)) >= 3L) df[[cn]] <- v
       }
-      df$FST_raw     <- num_col(c("^FST_raw$"))
-      df$FST_ENA     <- num_col(c("^FST_ENA$"))
-      df$FST_raw_lo  <- num_col(c("^FST_raw_CI_lo_loci$", "^FST_raw_lo$"))
-      df$FST_raw_hi  <- num_col(c("^FST_raw_CI_hi_loci$", "^FST_raw_hi$"))
-      df$FST_ENA_lo  <- num_col(c("^FST_ENA_CI_lo_loci$", "^FST_ENA_lo$"))
-      df$FST_ENA_hi  <- num_col(c("^FST_ENA_CI_hi_loci$", "^FST_ENA_hi$"))
-      df$DCSE_raw    <- num_col(c("^DCSE_raw$"))
-      df$DCSE_INA    <- num_col(c("^DCSE_INA$"))
-      df$DCSE_raw_lo <- num_col(c("^DCSE_raw_CI_lo_loci$", "^DCSE_raw_lo$"))
-      df$DCSE_raw_hi <- num_col(c("^DCSE_raw_CI_hi_loci$", "^DCSE_raw_hi$"))
-      df$DCSE_INA_lo <- num_col(c("^DCSE_INA_CI_lo_loci$", "^DCSE_INA_lo$"))
-      df$DCSE_INA_hi <- num_col(c("^DCSE_INA_CI_hi_loci$", "^DCSE_INA_hi$"))
-
-      fr_col <- function(pats, fallback_from) {
-        c <- .guess_col(nm, pats, NA_character_)
-        if (!is.na(c) && c %in% nm) suppressWarnings(as.numeric(ext[[c]]))
-        else .linearise(fallback_from)
-      }
-      df$FR        <- fr_col(c("^FR$", "^FR_ENA$"), df$FST_ENA)
-      df$FR_lo     <- fr_col(c("^FR_lo$", "^FR_ENA_lo_loci$"), df$FST_ENA_lo)
-      df$FR_hi     <- fr_col(c("^FR_hi$", "^FR_ENA_hi_loci$"), df$FST_ENA_hi)
-      df$FR_raw    <- fr_col(c("^FR_raw$"),    df$FST_raw)
-      df$FR_raw_lo <- fr_col(c("^FR_raw_lo$", "^FR_raw_lo_loci$"), df$FST_raw_lo)
-      df$FR_raw_hi <- fr_col(c("^FR_raw_hi$", "^FR_raw_hi_loci$"), df$FST_raw_hi)
-
-      df$Dgeo_m <- num_col(c("^Dgeo_m$", "^D_geo$", "^Distance$"))
-      lnd <- num_col(c("^lnDgeo$", "^ln\\(D_geo\\)$"))
-      df$lnDgeo <- ifelse(is.finite(lnd), lnd,
-                           ifelse(is.finite(df$Dgeo_m) & df$Dgeo_m > 0, log(df$Dgeo_m), NA_real_))
+      shiny::validate(shiny::need(ncol(df) >= 4L,
+        "The file needs 2 identifier columns and at least 2 numeric columns."))
       df
     })
 
@@ -298,22 +272,22 @@ server_isolation_by_distance <- function(id, rv) {
     output$ibd_col_geo_ui <- renderUI({
       cols <- .ibd_numeric_cols()
       selectInput(session$ns("ibd_col_geo"), "geographic distance", choices = cols,
-                  selected = .guess_col(cols, c("^lnDgeo$", "^Dgeo_m$", "Dgeo"), if (length(cols)) cols[1] else NULL))
+                  selected = .guess_col(cols, c("^lnDgeo$", "ln.?d", "^Dgeo_m$", "dgeo", "dist", "geo"), if (length(cols)) cols[1] else NULL))
     })
     output$ibd_col_avg_ui <- renderUI({
       cols <- .ibd_numeric_cols()
       selectInput(session$ns("ibd_col_avg"), "Genetic distance (ideally of the form FST/(1-FST))", choices = cols,
-                  selected = .guess_col(cols, c("^FR$", "^FR_raw$"), if (length(cols)) cols[1] else NULL))
+                  selected = .guess_col(cols, c("^FR$", "^FR_raw$", "^FR", "^FST", "^DCSE"), if (length(cols)) cols[1] else NULL))
     })
     output$ibd_col_lo_ui <- renderUI({
       cols <- .ibd_numeric_cols()
       selectInput(session$ns("ibd_col_lo"), "lower limit", choices = cols,
-                  selected = .guess_col(cols, c("^FR_lo$", "^FR_raw_lo$"), if (length(cols)) cols[1] else NULL))
+                  selected = .guess_col(cols, c("^FR_lo$", "^FR_raw_lo$", "FR.*(-i|_i|lo|low)", "lo(w|_)", "-i"), if (length(cols)) cols[1] else NULL))
     })
     output$ibd_col_hi_ui <- renderUI({
       cols <- .ibd_numeric_cols()
       selectInput(session$ns("ibd_col_hi"), "higher limit", choices = cols,
-                  selected = .guess_col(cols, c("^FR_hi$", "^FR_raw_hi$"), if (length(cols)) cols[1] else NULL))
+                  selected = .guess_col(cols, c("^FR_hi$", "^FR_raw_hi$", "FR.*(-s|_s|hi|high|up)", "hi(gh|_)", "-s"), if (length(cols)) cols[1] else NULL))
     })
 
     # Bootstrap over INDIVIDUALS (BS/Indiv) for the slope b, and Nb = 1/b.
@@ -562,6 +536,14 @@ server_isolation_by_distance <- function(id, rv) {
     }
 
     .mt_read_file <- function(fileinfo, sep, header) {
+      # the file is tried with the chosen separator first, then with the others
+      for (sp in unique(c(sep, "\t", ";", ","))) {
+        d <- .mt_read_file1(fileinfo, sp, header)
+        if (!is.null(d) && ncol(d) >= 3L) return(d)
+      }
+      shiny::validate(shiny::need(FALSE, "Could not parse the file. Check separator / header settings."))
+    }
+    .mt_read_file1 <- function(fileinfo, sep, header) {
       df <- tryCatch({
         path <- fileinfo$datapath
         lines <- readLines(path, warn = FALSE)
@@ -579,8 +561,7 @@ server_isolation_by_distance <- function(id, rv) {
                    stringsAsFactors = FALSE, check.names = FALSE,
                    fill = TRUE, quote = "\"", comment.char = "")
       }, error = function(e) NULL)
-      shiny::validate(shiny::need(!is.null(df) && nrow(df) >= 3L,
-        "Could not parse the file. Check separator / header settings."))
+      if (is.null(df) || nrow(df) < 3L) return(NULL)
       df
     }
 
@@ -620,19 +601,6 @@ server_isolation_by_distance <- function(id, rv) {
         if (!is.na(n)) sprintf(" (%d rows)", n) else "")
     }
     output$ibd_ext_file_status <- renderUI(.file_status_ui(input$ibd_ext_file, full_pair_table_external_r))
-    output$ibd_ext_dgeo_warning <- renderUI({
-      shiny::req(input$ibd_ext_file)
-      df <- tryCatch(full_pair_table_external_r(), error = function(e) NULL)
-      has_dgeo <- !is.null(df) && (
-        (!is.null(df$Dgeo_m) && any(is.finite(df$Dgeo_m))) ||
-        (!is.null(df$lnDgeo) && any(is.finite(df$lnDgeo)))
-      )
-      if (!has_dgeo) {
-        tags$p(style="color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:4px;padding:4px 6px;font-size:11px;margin-top:6px;",
-          icon("exclamation-triangle"), " No ", tags$code("Dgeo_m"), " or ",
-          tags$code("lnDgeo"), " column found in this file.")
-      }
-    })
     output$mt_file_status <- renderUI({
       .file_status_ui(input$mt_file, reactive(.mt_read_file(input$mt_file, input$mt_sep, input$mt_header)))
     })
@@ -779,7 +747,7 @@ server_isolation_by_distance <- function(id, rv) {
       p1v <- trimws(as.character(df[[p1c]])); p2v <- trimws(as.character(df[[p2c]]))
 
       n_perm <- as.integer(input$mt_n_perm)
-      p_formula <- input$mt_p_formula %||% "plus1"
+      p_formula <- "plus1"   # (b+1)/(m+1) only
       seed <- as.integer(rv$seed %||% 12345L)  # global seed set in Import data
 
       # Recover BOTH the linear (raw-distance) and log-distance scale of a
