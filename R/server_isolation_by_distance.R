@@ -581,6 +581,8 @@ server_isolation_by_distance <- function(id, rv) {
           extra_keep$.key <- key(extra[[1L]], extra[[2L]])
           extra_keep <- extra_keep[!duplicated(extra_keep$.key), , drop = FALSE]
           df$.key <- key(df$Pop1, df$Pop2)
+          # a column of the extra file replaces a column of the same name: no ".x" / ".y" suffixes
+          df <- df[, setdiff(names(df), val_cols), drop = FALSE]
           df <- merge(df, extra_keep, by = ".key", all.x = TRUE, sort = FALSE)
           df$.key <- NULL
         }
@@ -910,10 +912,10 @@ server_isolation_by_distance <- function(id, rv) {
 
 
     # -- One button, one click, one action: clicking "Run" IS the download
-    #    request itself - a single results file, zipped, no separate
+    #    request itself - a single results file (no zip), no separate
     #    "parameters" file (not needed for Mantel).
     output$run_mantel <- downloadHandler(
-      filename = function() paste0(mt_out_root_r(), "-Mantel-Res.zip"),
+      filename = function() paste0(mt_out_root_r(), "-Mantel-Res.txt"),
       content  = function(file) {
         t0 <- Sys.time()
         nid <- pga_notify_start()
@@ -932,7 +934,7 @@ server_isolation_by_distance <- function(id, rv) {
         pga_write_time(con, t0)
         close(con)
 
-        zip::zip(zipfile = file, files = basename(p1), root = tmpdir)
+        file.copy(p1, file, overwrite = TRUE)   # a single file: no zip
         pga_notify_done(nid, t0)
       }
     )
