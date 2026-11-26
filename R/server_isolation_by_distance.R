@@ -793,7 +793,7 @@ server_isolation_by_distance <- function(id, rv) {
         # behind the scenes, matching the conventional 2D isolation-by-
         # distance model; any other (non-distance) column is used as-is.
         # Rousset's 1D/2D force raw/ln(X) regardless of this.
-        base_log  <- sc$looks_geo_dist
+        base_log  <- FALSE   # Pearson/Spearman use the column exactly as picked
         use_log   <- if (!is.na(def$force_log)) def$force_log else base_log
         calc_stat <- def$calc
 
@@ -846,7 +846,7 @@ server_isolation_by_distance <- function(id, rv) {
         res$label <- def$label
         res$use_log <- use_log
         x_base_name <- if (sc$looks_already_log) sub("^ln|^log", "", xcol, ignore.case = TRUE) else xcol
-        res$x_label <- paste0(x_base_name, if (use_log) " (ln)" else "")
+        res$x_label <- if (is.na(def$force_log)) xcol else paste0(x_base_name, if (use_log) " (ln)" else "")
         res$y_label <- ycol
         res
       }
@@ -891,10 +891,9 @@ server_isolation_by_distance <- function(id, rv) {
           X         = s$x_label,
           Y         = s$y_label,
           Observed  = .fmt_stat(s$stat_obs),
-          # slope, intercept and R2 belong to the linear regression: they are not
-          # defined for the rank-based Spearman statistic
-          Slope     = if (identical(k, "spearman")) "NA" else .fmt_stat(s$slope),
-          Intercept = if (identical(k, "spearman")) "NA" else .fmt_stat(s$intercept),
+          # Pearson: R2 = r^2 (same X and Y); Spearman: none; Rousset: R2 and intercept of the
+          # regression whose slope is the Observed value
+          Intercept = if (k %in% c("rousset1d", "rousset2d")) .fmt_stat(s$intercept) else "NA",
           R2        = if (identical(k, "spearman")) "NA" else sprintf("%.4f", s$r2),
           p_pos_col = if (is.na(p_pos)) "NA" else sprintf("%.4f", p_pos),
           p_neg_col = if (is.na(p_neg)) "NA" else sprintf("%.4f", p_neg),
@@ -905,7 +904,7 @@ server_isolation_by_distance <- function(id, rv) {
       # \uXXXX escapes aren't allowed inside backtick-quoted names in R
       # source code, so the "R2"/"p+"/"p-" column names are set here,
       # as plain string literals, rather than at construction time above.
-      names(d) <- c("Statistic", "X", "Y", "Observed", "Slope", "Intercept",
+      names(d) <- c("Statistic", "X", "Y", "Observed", "Intercept",
                      "R2", "p+", "p-", "p_2sided")   # plain ASCII: R-squared shown as "R2"
       d
     }
